@@ -37,8 +37,8 @@ else
 	endif
 endif
 
-LIBDIR      = ../lib
-BINDIR      = ../bin
+LIBDIR      = ../../lib
+BINDIR      = ../../bin
 
 LIB_TARGETS = $(foreach pebil_lib,$(PEBIL_LIBS),$(LIBDIR)/$(pebil_lib))
 MPICC       = @MPICC@
@@ -53,8 +53,8 @@ EXTRA_FLAGS = $(SHARED_OPT)
 SHARED_LIB  = -shared
 AR          = ar rcs
 
-REUSE_LIBS  = -L../instcode/ReuseDistance -lReuseDistance
-EXTRA_INC   = -I../instcode -I../instcode/ReuseDistance
+REUSE_LIBS  = -L../../external/epa-inst-libs/ReuseDistance -lReuseDistance
+EXTRA_INC   = -I../../external/epa-inst-libs -I../../external/epa-inst-libs/ReuseDistance
 
 ifeq ($(PEBIL_PAPI_BUILD),yes)
 	EXTRA_INC += -I$(PAPI_PATH)/include
@@ -66,10 +66,10 @@ SHARED_COMMON_OBJS = $(LIBDIR)/InstrumentationCommon.O $(LIBDIR)/ThreadedCommon.
 ASL_OBJS = $(LIBDIR)/AddressStreamBase.O $(LIBDIR)/AddressRange.O $(LIBDIR)/CacheSimulation.O $(LIBDIR)/ReuseDistanceASI.O $(LIBDIR)/ScatterGatherLength.O $(LIBDIR)/SpatialLocality.O $(LIBDIR)/AddressStreamDriver.O
 
 ifeq ($(EPA_TOOLS_AVAILABLE),yes)
-  ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/PrefetchSimulation.o
-  ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/SpatialLocalityPerMemOp.o
+  ASL_OBJS += $(EPA_TOOLS_PATH)/external/epa-inst-libs/PrefetchSimulation.o
+  ASL_OBJS += $(EPA_TOOLS_PATH)/external/epa-inst-libs/SpatialLocalityPerMemOp.o
   EXTRA_FLAGS += -DHAS_EPA_TOOLS
-  EXTRA_INC += -I$(EPA_TOOLS_PATH)/instcode
+  EXTRA_INC += -I$(EPA_TOOLS_PATH)/external/epa-inst-libs
 endif
 
 ifeq ($(ADAMANT_LIBS_BUILD),yes)
@@ -141,6 +141,6 @@ clean:
 	rm -f $(LIBDIR)/*.o $(LIBDIR)/*.O $(LIBDIR)/*.i $(LIBDIR)/*.s $(LIBDIR)/*.ii $(ALL_TARGETS)
 
 install:
-	echo "Nothing to install in instcode"
+	echo "Nothing to install in external/epa-inst-libs"
 	#cp $(LIB_TARGETS) $(LIBDIR)
 
