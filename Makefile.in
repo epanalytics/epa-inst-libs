@@ -18,23 +18,14 @@
 # * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # */
 
-STATIC_INST_LIB  = @PEBIL_STATIC_BUILD@
-ADAMANT_LIBS_BUILD = @ADAMANT_LIBS_BUILD@
 EPA_TOOLS_AVAILABLE = @PEBIL_EPA_TOOLS_AVAILABLE@
 EPA_TOOLS_PATH = @PEBIL_SUBDIR_EPA_TOOLS_PATH@
 PEBIL_PAPI_BUILD = @PEBIL_PAPI_BUILD@
 PAPI_PATH = @PAPI_PATH@
-PEBIL_LIBS = 
-ifeq ($(STATIC_INST_LIB),yes)
-	PEBIL_LIBS = libtimer.a  libclassifier.a  libpfreq.a  libtautrace.a  libcounter.a 
-	ifeq ($(PEBIL_PAPI_BUILD),yes)
-		PEBIL_LIBS += libpapiinst.a libpapifunc.a
-	endif
-else
-	PEBIL_LIBS = libpebilruntime.so libtimer.so libclassifier.so libpfreq.so libtautrace.so liblooptimer.so libcounter.so libaddressstream.so
-	ifeq ($(PEBIL_PAPI_BUILD),yes)
-		PEBIL_LIBS += libpapiinst.so libpapifunc.so
-	endif
+
+PEBIL_LIBS = libpebilruntime.so libtimer.so libclassifier.so libpfreq.so libtautrace.so liblooptimer.so libcounter.so libaddressstream.so
+ifeq ($(PEBIL_PAPI_BUILD),yes)
+	PEBIL_LIBS += libpapiinst.so libpapifunc.so
 endif
 
 LIBDIR      = ../../lib
@@ -43,7 +34,7 @@ BINDIR      = ../../bin
 LIB_TARGETS = $(foreach pebil_lib,$(PEBIL_LIBS),$(LIBDIR)/$(pebil_lib))
 MPICC       = @MPICC@
 MPICXX      = @MPICXX@
-CFLAGS      = @CFLAGS@ @MPI_FLAGS@ @CPUFREQ_FLAGS@ @ADAMANT_HEADER_FLAGS@  @THROTTLER_FLAGS@ @PEBIL_DEBUG@ -w
+CFLAGS      = @CFLAGS@ @MPI_FLAGS@ @CPUFREQ_FLAGS@ @THROTTLER_FLAGS@ @PEBIL_DEBUG@ -w
 CXXFLAGS    = @CXXFLAGS@ @MPI_CXXFLAGS@ @MPI_FLAGS@ @CPUFREQ_FLAGS@ @ADAMANT_HEADER_FLAGS@  @THROTTLER_FLAGS@ @PEBIL_DEBUG@ -w
 
 ALL_TARGETS	=	$(LIB_TARGETS)
@@ -72,11 +63,7 @@ ifeq ($(EPA_TOOLS_AVAILABLE),yes)
   EXTRA_INC += -I$(EPA_TOOLS_PATH)/external/epa-inst-libs
 endif
 
-ifeq ($(ADAMANT_LIBS_BUILD),yes)
-	EXTRA_LIBS = -ldl -lpthread -ladm
-else
-	EXTRA_LIBS = -ldl -lpthread
-endif
+EXTRA_LIBS = -ldl -lpthread
 
 # opempi does not automatically link fortran mpi
 ifeq ($(MPICC), mpicc)
