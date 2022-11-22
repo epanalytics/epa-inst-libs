@@ -1,4 +1,10 @@
+#Ignore files created by configuration
 Makefile
+config.log
+config.status
+autom4te.cache
+
+# Ignore files created by build
 *.o
 *.O
 *.so
