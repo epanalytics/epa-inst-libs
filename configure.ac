@@ -22,6 +22,9 @@
 
 AC_PREREQ([2.63])
 AC_INIT(epa-inst-libs, 1.0, allysonc@epanalytics.com)
+# The presence of install-sh is sometimes required to configure a subdirectory
+# It doesn't actually do anything. autoconf is just buggy
+AC_CONFIG_AUX_DIR([config])
 AC_CONFIG_SRCDIR([InstrumentationCommon.hpp])
 
 # Checks for programs.
@@ -38,8 +41,10 @@ AC_SUBST(PEBIL_DEBUG)
 AC_SUBST(PEBIL_EPA_TOOLS_AVAILABLE)
 AC_SUBST(PEBIL_SUBDIR_EPA_TOOLS_PATH)
 AC_SUBST(PEBIL_PAPI_BUILD)
-AC_ARG_VAR(PAPI_PATH,[path to PAPI folder])
+AC_SUBST(PEBIL_PAPI_PATH)
 AC_SUBST(CPUFREQ_FLAGS)
+AC_SUBST(INST_LIBS_LIBDIR)
+AC_SUBST(INST_LIBS_BINDIR)
 
 
 AC_CHECK_PROG(OPENMPI_IS_NEW, mpifort, "yes")
