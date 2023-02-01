@@ -33,6 +33,7 @@ AC_PROG_CC
 AC_PROG_CPP
 
 # Get the following flags from a tool configuration
+AC_SUBST(DYN_INST_FLAGS)
 AC_SUBST(MPICC)
 AC_SUBST(MPICXX)
 AC_SUBST(MPI_FLAGS)
