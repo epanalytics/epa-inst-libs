@@ -643,6 +643,7 @@ MPI_CXXFLAGS
 MPI_FLAGS
 MPICXX
 MPICC
+DYN_INST_FLAGS
 CPP
 ac_ct_CC
 CFLAGS
@@ -3556,6 +3557,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 # Get the following flags from a tool configuration
+
 
 
 

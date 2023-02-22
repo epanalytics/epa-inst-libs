@@ -29,7 +29,9 @@
 
 #include <InstrumentationCommon.hpp>
 #include <DataManager.hpp>
+#ifndef NO_DYN_INST
 #include <DynamicInstrumentation.hpp>
+#endif
 #include <Metasim.hpp>
 #include <ThreadedCommon.hpp>
 #include <TimerFunctions.hpp>
@@ -51,7 +53,9 @@ using namespace std;
 
 DataManager<FunctionTimers*>* AllData = NULL;
 
+#ifndef NO_DYN_INST
 DynamicInstrumentation* DynamicPoints = NULL;
+#endif
 
 // by default, do not shut off function timing instrumentation.
 // please set FTIMER_SHUTOFF to something other than zero to enable
@@ -164,7 +168,7 @@ FunctionTimers* GenerateFunctionTimers(FunctionTimers* timers, uint32_t typ, ima
             std::stringstream strStream;
             strStream << ftimeCPU;
             strStream >> timerCPUFreq;
-            inform << "Got custom FTIMER_CPU_FREQ ***(in Hz)** from the user" 
+            inform << "Got custom FTIMER_CPU_FREQ ***(in Hz)** from the user"
               << " :: " << timerCPUFreq << endl;
         } else {
             inform << "***Using the default CPU clock rate to calculate "
@@ -271,6 +275,7 @@ extern "C"
         }
         timers->inFunction[funcIndex] = recDepth;
 
+#ifndef NO_DYN_INST
         if(shutoffFunctionTimers) {
             if (timers->functionEntryCounts[funcIndex] % shutoffIters == 0){
                 // time per visit is total t
@@ -291,12 +296,13 @@ extern "C"
                     set<uint64_t> inits;
                     inits.insert(this_key);
                     inits.insert(corresponding_entry_key);
-                    DynamicPoints->SetDynamicPoints(inits, false); 
+                    DynamicPoints->SetDynamicPoints(inits, false);
                     timers->functionShutoff[funcIndex] = 1;
                     AllData->UnLock();
                 }
             }
         }
+#endif // NO_DYN_INST
         return 0;
     }
 
@@ -309,7 +315,9 @@ extern "C"
     // Entry function for threads
     void* tool_thread_init(thread_key_t tid) {
         if (AllData){
+#ifndef NO_DYN_INST
             if(DynamicPoints->IsThreadedMode())
+#endif
                 AllData->AddThread(tid);
         } else {
             ErrorExit("Calling PEBIL thread initialization library for thread "
@@ -324,10 +332,11 @@ extern "C"
         return NULL;
     }
 
+#ifndef NO_DYN_INST
     // Create mutex to ensure that Dynamics is initialized exactly once
     static pthread_mutex_t dynamic_init_mutex = PTHREAD_MUTEX_INITIALIZER;
     // initialize dynamic instrumentation
-    void* tool_dynamic_init(uint64_t* count, DynamicInst** dyn, bool* 
+    void* tool_dynamic_init(uint64_t* count, DynamicInst** dyn, bool*
       isThreadedModeFlag) {
         pthread_mutex_lock(&dynamic_init_mutex);
         if (DynamicPoints == NULL) {
@@ -338,6 +347,7 @@ extern "C"
         pthread_mutex_unlock(&dynamic_init_mutex);
         return NULL;
     }
+#endif // NO_DYN_INST
 
     // Create mutex to ensure that each image is initialized exactly once
     static pthread_mutex_t image_init_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -366,12 +376,14 @@ extern "C"
         // Add this image
         AllData->AddImage(timers, td, *key);
 
+#ifndef NO_DYN_INST
         // Remove this instrumentation
         // Must be done after the image is added, or threads may get to the 
         // instrumentation before the image is initialized
         set<uint64_t> inits;
         inits.insert(GENERATE_KEY(*key, PointType_inits));
         DynamicPoints->SetDynamicPoints(inits, false);
+#endif // NO_DYN_INST
 
         pthread_mutex_unlock(&image_init_mutex);
         return NULL;
@@ -389,9 +401,11 @@ extern "C"
 
         finalized = true;
 
+#ifndef NO_DYN_INST
         if (DynamicPoints != NULL) {
             delete DynamicPoints;
         }
+#endif
 
         if (AllData == NULL){
             ErrorExit("data manager does not exist. no images were intialized",
