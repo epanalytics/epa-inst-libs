@@ -626,11 +626,7 @@ enable_option_checking=no
 ac_subst_vars='LTLIBOBJS
 subdirs
 LIBOBJS
-THROTTLER_FLAGS
-EGREP
-GREP
-INST_LIBS_MPIFC_OPENMPI_LIB
-OPENMPI_IS_NEW
+PEBIL_VERBOSE_SLICER
 INST_LIBS_BINDIR
 INST_LIBS_LIBDIR
 CPUFREQ_FLAGS
@@ -643,6 +639,11 @@ MPI_CXXFLAGS
 MPI_FLAGS
 MPICXX
 MPICC
+THROTTLER_FLAGS
+EGREP
+GREP
+INST_LIBS_MPIFC_OPENMPI_LIB
+OPENMPI_IS_NEW
 CPP
 ac_ct_CC
 CFLAGS
@@ -673,6 +674,7 @@ infodir
 docdir
 oldincludedir
 includedir
+runstatedir
 localstatedir
 sharedstatedir
 sysconfdir
@@ -747,6 +749,7 @@ datadir='${datarootdir}'
 sysconfdir='${prefix}/etc'
 sharedstatedir='${prefix}/com'
 localstatedir='${prefix}/var'
+runstatedir='${localstatedir}/run'
 includedir='${prefix}/include'
 oldincludedir='/usr/include'
 docdir='${datarootdir}/doc/${PACKAGE_TARNAME}'
@@ -999,6 +1002,15 @@ do
   | -silent | --silent | --silen | --sile | --sil)
     silent=yes ;;
 
+  -runstatedir | --runstatedir | --runstatedi | --runstated \
+  | --runstate | --runstat | --runsta | --runst | --runs \
+  | --run | --ru | --r)
+    ac_prev=runstatedir ;;
+  -runstatedir=* | --runstatedir=* | --runstatedi=* | --runstated=* \
+  | --runstate=* | --runstat=* | --runsta=* | --runst=* | --runs=* \
+  | --run=* | --ru=* | --r=*)
+    runstatedir=$ac_optarg ;;
+
   -sbindir | --sbindir | --sbindi | --sbind | --sbin | --sbi | --sb)
     ac_prev=sbindir ;;
   -sbindir=* | --sbindir=* | --sbindi=* | --sbind=* | --sbin=* \
@@ -1136,7 +1148,7 @@ fi
 for ac_var in	exec_prefix prefix bindir sbindir libexecdir datarootdir \
 		datadir sysconfdir sharedstatedir localstatedir includedir \
 		oldincludedir docdir infodir htmldir dvidir pdfdir psdir \
-		libdir localedir mandir
+		libdir localedir mandir runstatedir
 do
   eval ac_val=\$$ac_var
   # Remove trailing slashes.
@@ -1289,6 +1301,7 @@ Fine tuning of the installation directories:
   --sysconfdir=DIR        read-only single-machine data [PREFIX/etc]
   --sharedstatedir=DIR    modifiable architecture-independent data [PREFIX/com]
   --localstatedir=DIR     modifiable single-machine data [PREFIX/var]
+  --runstatedir=DIR       modifiable per-process data [LOCALSTATEDIR/run]
   --libdir=DIR            object code libraries [EPREFIX/lib]
   --includedir=DIR        C header files [PREFIX/include]
   --oldincludedir=DIR     C header files for non-gcc [/usr/include]
@@ -3555,21 +3568,6 @@ ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $
 ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
-# Get the following flags from a tool configuration
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # Extract the first word of "mpifort", so it can be a program name with args.
 set dummy mpifort; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
@@ -3612,7 +3610,6 @@ if test x"$OPENMPI_IS_NEW" == x"yes"; then
 else
   INST_LIBS_MPIFC_OPENMPI_LIB="-lmpi_f77 -lmpi_f90"
 fi
-
 
 
 
@@ -3892,6 +3889,20 @@ fi
 else
   throttler_headers=no
 fi
+
+
+
+
+# Get the following flags from a tool configuration
+
+
+
+
+
+
+
+
+
 
 
 

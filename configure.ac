@@ -32,6 +32,24 @@ AC_PROG_CXX
 AC_PROG_CC
 AC_PROG_CPP
 
+AC_CHECK_PROG(OPENMPI_IS_NEW, mpifort, "yes")
+if test x"$OPENMPI_IS_NEW" == x"yes"; then
+  INST_LIBS_MPIFC_OPENMPI_LIB="-lmpi_mpifh"
+else
+  INST_LIBS_MPIFC_OPENMPI_LIB="-lmpi_f77 -lmpi_f90"
+fi
+AC_SUBST(INST_LIBS_MPIFC_OPENMPI_LIB)
+
+AC_ARG_WITH(throttler_headers,
+            [AS_HELP_STRING([--with-throttler-headers=<path>],[specify path to throttler headers])],
+            [throttler_headers=$withval
+             AC_CHECK_HEADER([$throttler_headers/throttler.h],
+                             [THROTTLER_FLAGS="-DHAVE_THROTTLER_H -I$throttler_headers"],
+                             [AC_MSG_ERROR(throttler.h not found using $throttler_headers)])],
+            [throttler_headers=no])
+AC_SUBST(THROTTLER_FLAGS)
+
+
 # Get the following flags from a tool configuration
 AC_SUBST(MPICC)
 AC_SUBST(MPICXX)
@@ -45,27 +63,7 @@ AC_SUBST(PEBIL_PAPI_PATH)
 AC_SUBST(CPUFREQ_FLAGS)
 AC_SUBST(INST_LIBS_LIBDIR)
 AC_SUBST(INST_LIBS_BINDIR)
-
-
-AC_CHECK_PROG(OPENMPI_IS_NEW, mpifort, "yes")
-if test x"$OPENMPI_IS_NEW" == x"yes"; then
-  INST_LIBS_MPIFC_OPENMPI_LIB="-lmpi_mpifh"
-else
-  INST_LIBS_MPIFC_OPENMPI_LIB="-lmpi_f77 -lmpi_f90"
-fi
-AC_SUBST(INST_LIBS_MPIFC_OPENMPI_LIB)
-
-
-AC_ARG_WITH(throttler_headers,
-            [AS_HELP_STRING([--with-throttler-headers=<path>],[specify path to throttler headers])],
-            [throttler_headers=$withval
-             AC_CHECK_HEADER([$throttler_headers/throttler.h],
-                             [THROTTLER_FLAGS="-DHAVE_THROTTLER_H -I$throttler_headers"],
-                             [AC_MSG_ERROR(throttler.h not found using $throttler_headers)])],
-            [throttler_headers=no])
-AC_SUBST(THROTTLER_FLAGS)
-
-
+AC_SUBST(PEBIL_VERBOSE_SLICER)
 
 
 # Checks for header files.
