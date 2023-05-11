@@ -626,11 +626,7 @@ enable_option_checking=no
 ac_subst_vars='LTLIBOBJS
 subdirs
 LIBOBJS
-THROTTLER_FLAGS
-EGREP
-GREP
-INST_LIBS_MPIFC_OPENMPI_LIB
-OPENMPI_IS_NEW
+PEBIL_VERBOSE_SLICER
 INST_LIBS_BINDIR
 INST_LIBS_LIBDIR
 CPUFREQ_FLAGS
@@ -643,7 +639,11 @@ MPI_CXXFLAGS
 MPI_FLAGS
 MPICXX
 MPICC
-DYN_INST_FLAGS
+THROTTLER_FLAGS
+EGREP
+GREP
+INST_LIBS_MPIFC_OPENMPI_LIB
+OPENMPI_IS_NEW
 CPP
 ac_ct_CC
 CFLAGS
@@ -3556,22 +3556,6 @@ ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $
 ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
-# Get the following flags from a tool configuration
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # Extract the first word of "mpifort", so it can be a program name with args.
 set dummy mpifort; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
@@ -3614,7 +3598,6 @@ if test x"$OPENMPI_IS_NEW" == x"yes"; then
 else
   INST_LIBS_MPIFC_OPENMPI_LIB="-lmpi_f77 -lmpi_f90"
 fi
-
 
 
 
@@ -3894,6 +3877,20 @@ fi
 else
   throttler_headers=no
 fi
+
+
+
+
+# Get the following flags from a tool configuration
+
+
+
+
+
+
+
+
+
 
 
 

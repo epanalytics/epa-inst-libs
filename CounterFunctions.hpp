@@ -40,13 +40,14 @@ typedef struct {
     char** Functions;
     char* Application;
     char* Extension;
-    bool sanitize;
 } CounterArray;
 
 CounterArray* GenerateCounterArray(CounterArray* ctrs, uint32_t typ,
   image_key_t iid, thread_key_t tid, image_key_t firstimage);
 uint64_t RefCounterArray(CounterArray* ctrs);
 void DeleteCounterArray(CounterArray* ctrs);
+
+static bool ReadEnvUint32(std::string name, uint32_t* var);
 
 // For testing only
 class DynamicInstrumentation;
