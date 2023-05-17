@@ -38,6 +38,7 @@ typedef pthread_t thread_key_t;
 enum EntryType: uint8_t {
   MEM_ENTRY = 0,
   VECTOR_ENTRY,
+  SVE_ENTRY,
   EntryType_Total
 };
 
@@ -49,6 +50,15 @@ struct VectorAddress {
     uint32_t  numIndices;
 };
 
+struct SVEAddress {
+    uint8_t vectorLength;  // 2048/8 = 256
+    uint64_t memAddress;
+    uint64_t shiftAmount;
+    bool useZRegFlag;
+    uint8_t predBitsArr[32]; // 2048/64
+    uint8_t zRegArr[256];   // 2048/8 
+};
+
 typedef struct BufferEntry_s {
     enum EntryType  type;
     uint8_t         swprefetchflag;  // Is a software prefetch op
@@ -58,6 +68,7 @@ typedef struct BufferEntry_s {
     union {
         uint64_t address;        // value simulated
         struct VectorAddress vectorAddress;
+        struct SVEAddress sveAddress;
     };
     //uint64_t    threadid;        // Error-checking
 } BufferEntry;

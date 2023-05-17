@@ -197,6 +197,13 @@ class AddressStreamDriver {
     void SetSampler(SamplingMethod* s);
 };
 
+//// PEBIL and EPAX need to unpack memory operations differently.
+//class EPAXAddressStreamDriver : public AddressStreamDriver {
+//};
+//
+//class PEBILAddressStreamDriver : public AddressStreamDriver {
+//};
+
 void GetBufferIds(BufferEntry* b, image_key_t* i);
 
 
