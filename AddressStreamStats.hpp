@@ -38,7 +38,8 @@ typedef pthread_t thread_key_t;
 enum EntryType: uint8_t {
   MEM_ENTRY = 0,
   VECTOR_ENTRY,
-  SVE_ENTRY,
+  EPAX_VECTOR_ENTRY,
+  EPAX_INDIRECT_ENTRY,
   EntryType_Total
 };
 
@@ -50,13 +51,39 @@ struct VectorAddress {
     uint32_t  numIndices;
 };
 
-struct SVEAddress {
-    uint8_t vectorLength;  // 2048/8 = 256
-    uint64_t memAddress;
-    uint64_t shiftAmount;
-    bool useZRegFlag;
-    uint8_t predBitsArr[32]; // 2048/64
-    uint8_t zRegArr[256];   // 2048/8 
+// EPAX-only. For use with SVE that do a contiguous memory access.
+// The addressing modes are called:
+// 1. Scalar plus immediate
+// 2. Scalar plus scale
+// Since this is a contiguous memory access, you only need the first address
+// accessed and how much it accesses. Use the number of elements to process
+// each accessed address. Use the number of elements (TODO - is this right,
+// Emmet) to determine which mask bits to use.
+struct EPAXVectorAddress {
+    uint64_t memAddress;    // First Address in contiguous mem access
+    uint64_t sizeOfAccess;  // Size of mem access in (bits?)
+    uint16_t numElements;   // Number of addresses accessed
+    uint8_t predReg[32];    // 2048/64
+};
+
+// EPAX-only. For use with SVE that do a scatter/gather memory access.
+// The addressing modes are called:
+// 1. Scalar plus vector
+// 2. Vector plus immediate
+// These require calculating the address based on the ARM documentation and
+// the given values. Scalar + vector uses a base address, may sign extend and/or
+// shift the given index value and then add the values together. Vector +
+// immediate does not use a base address and instead adds an immediate to each
+// index in the vector.
+struct EPAXIndirectAddress {
+    uint64_t baseAddress;   // scalar + vec: Value of Xn OR 0
+    bool doesExtension;     // scalar + vec: do a signed or unsigned extension
+    bool signedExtend;      // scalar + vec: signedExtend or unsignedExtend
+    uint8_t shiftAmount;    // scalar + vec: How much to shift index
+    uint64_t immediate;     // vector + imm: offset * mbytes OR 0
+    uint16_t numElements;   // Number of elements in index vector
+    uint8_t predReg[32];    // 2048/64
+    uint8_t indexVector[256];   // 2048/8 
 };
 
 typedef struct BufferEntry_s {
@@ -68,7 +95,8 @@ typedef struct BufferEntry_s {
     union {
         uint64_t address;        // value simulated
         struct VectorAddress vectorAddress;
-        struct SVEAddress sveAddress;
+        struct EPAXVectorAddress epaxVectorAddress;
+        struct EPAXIndirectAddress epaxIndirectAddress;
     };
     //uint64_t    threadid;        // Error-checking
 } BufferEntry;
@@ -94,6 +122,7 @@ typedef struct AddressStreamStats_s {
                         // do this for all blocks within the loop
                         // Note: includes all other blocks in the loop
     bool Master;        // Master image?
+    uint32_t SVEVectorLength;  // Used only by EPAX
     uint32_t Phase;
     uint32_t AllocCount;
     uint32_t BlockCount;
