@@ -629,21 +629,26 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
             uint8_t* predReg = reference->epaxVectorAddress->predReg;
             uint16_t numElems = reference->epaxVectorAddress->numElements;
             // in bytes
-            uint16_t mElemReadSize = sizeOfAccess/numElems;
+            uint16_t mMemElemSize = sizeOfAccess/numElems;
             uint32_t vecLen = stats->SVEVectorLength/8;
-            uint16_t mElemWriteSize = vecLen/numElems;
-            uint16_t length = 0;
+            // in bytes
+            uint16_t mRegElemSize = vecLen/numElems;
+            length = 0;
+            // index into the z register
             for (int index=0;index<numElems;index++) { // loop over predReg
                 // need to use this information to fill up 
                 // stats->addressForProcessing as well as creating the length
                 // variable
-                uint16_t byteToCheckIndex = index*mElemWriteSize/8;
-                uint8_t bytetoCheck = predReg[toCheckIndex];
-                uint8_t bitToCheck = index*mElemWriteSize%8
-                uint64_t curAddress = memAddress + (index*mElemReadSize);
+                //
+                uint64_t curAddress = memAddress + (index*mMemElemSize);
+
+                uint16_t byteToCheckIndex = (index*mRegElemSize)/8;
+                uint8_t bytetoCheck = predReg[byteToCheckIndex];
+                uint8_t bitToCheck = (index*mRegElemSize)%8;
+
                 // don't really need the last != check but just for sanity
                 // make sure I don't have a off by 1 error
-                bool isOn = (byteToCheck | (1<<bitToCheck)) != 0;
+                bool isOn = (byteToCheck & (1<<bitToCheck)) != 0;
                 if (isOn) {
                     stats->addressesForProcessing[length] = curAddress;
                     length++;
