@@ -618,8 +618,56 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                           "require a small refactor.\n");
                 }
             }
-        }// end of if vector entry
+        // end of if vector entry
+        } else if (reference->type == EPAX_VECTOR_ENTRY) {
+            // Figure out and document well in code and or wiki wtflip 
+            // memvecflag means
+            // TODO set maxNumAddresses to 256
+            uint64_t memAddress = reference->epaxVectorAddress->memAddress
+            // in bytes
+            uint64_t mAccess = reference->epaxVectorAddress->sizeOfAccess/8;
+            uint8_t* predReg = reference->epaxVectorAddress->predReg;
+            uint16_t numElems = reference->epaxVectorAddress->numElements;
+            // in bytes
+            uint16_t mElemReadSize = sizeOfAccess/numElems;
+            uint32_t vecLen = stats->SVEVectorLength/8;
+            uint16_t mElemWriteSize = vecLen/numElems;
+            uint16_t length = 0;
+            for (int index=0;index<numElems;index++) { // loop over predReg
+                // need to use this information to fill up 
+                // stats->addressForProcessing as well as creating the length
+                // variable
+                uint16_t byteToCheckIndex = index*mElemWriteSize/8;
+                uint8_t bytetoCheck = predReg[toCheckIndex];
+                uint8_t bitToCheck = index*mElemWriteSize%8
+                uint64_t curAddress = memAddress + (index*mElemReadSize);
+                // don't really need the last != check but just for sanity
+                // make sure I don't have a off by 1 error
+                bool isOn = (byteToCheck | (1<<bitToCheck)) != 0;
+                if (isOn) {
+                    stats->addressesForProcessing[length] = curAddress;
+                    length++;
+                }
+            }
+            // Is memvecflag true for sve type instructions??
+            // probably want true TODO (ask AT)
+            memvecFlag = true;
 
+
+        // end of epax vectory entry
+        } else if (reference->type == EPAX_INDIRECT_ENTRY) {
+            uint8_t* predReg = reference->epaxIndirectAddress->predReg;
+            for () { // loop over predReg
+
+            }
+            // Is memvecflag true for sve type instructions??
+            // definitely  want true
+
+        // end of epax indirect address
+        }
+
+        // check if we need to set maxNumAddresses somehwere TODO 
+        // We can potentially have a possible maximum of 256 1 byte elements
         debug(assert(length <= maxNumAddresses));
 
         // Process for each memory handler
