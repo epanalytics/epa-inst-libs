@@ -661,12 +661,97 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
 
         // end of epax vectory entry
         } else if (reference->type == EPAX_INDIRECT_ENTRY) {
+            uint64_t baseAddress = reference->epaxIndirectAddress->baseAddress;
+            uint8_t doesExtension = reference->epaxIndirectAddress->doesExtension;
+            uint8_t signedExtension = reference->epaxIndirectAddress->signedExtension;
+            uint8_t shiftAmount = reference->epaxIndirectAddress->shiftAmount;
+            uint8_t immediate = reference->epaxIndirectAddress->immediate;
+            // is this register side or memory side or both?
+            uint16_t numElements = reference->epaxIndirectAddress->numElements;
             uint8_t* predReg = reference->epaxIndirectAddress->predReg;
-            for () { // loop over predReg
-
+            uint8_t* indexVector = reference->epaxIndirectAddress->indexVector;
+            // in bits
+            uint32_t VecLen = stats-> SVEVectorLength;
+            // in bits
+            uint32_t elemSize = VecLen/numElements;
+            std::vector<uint64_t> valueArray;
+            for (size_t i=0;i<numOfElems;i++) {
+                uint64_t valToPush;
+                if (elemSize == 8) {
+                    //valueArray.push_back((uint64_t) indexVector[i]);
+                    valToPush = (uint64_t) indexVector[i];
+                    if (doesExtension == 1 && signedExtension == 1) {
+                        uint8_t bitToExtend = valToPush & 0x80; // signBit
+                        if (bitToExtend != 0) { // fill with 1s
+                            valToPush | 0xffffffffffffff00
+                        }
+                    }
+                } else if (elemSize == 16) {
+                    valToPush = indexVector[i*2];
+                    valToPush = valToPush | (((uint64_t) indexVector[i*2]+1) << 8);
+                    if (doesExtension == 1 && signedExtension == 1) {
+                        uint16_t bitToExtend = valToPush & 0x8000;
+                        if (bitToExtend !=0) { // fill with 1s
+                            valToPush | 0xffffffffffff0000;
+                        }
+                    }
+                    //valueArray.push_back(valToPush);
+                } else if (elemSize == 32) {
+                    valToPush = indexVector[i*4];
+                    valToPush = valToPush | (((uint64_t) indexVector[i*4]+1) << 8);
+                    valToPush = valToPush | (((uint64_t) indexVector[i*4]+2) << 16);
+                    valToPush = valToPush | (((uint64_t) indexVector[i*4]+3) << 24);
+                    if (doesExtension == 1 && signedExtension == 1) {
+                        uint32_t bitToExtend = valToPush & 0x80000000;
+                        if (bitToExtend !=0) { // fill with 1s
+                            valToPush | 0xffffffff00000000;
+                        }
+                    }
+                    //valueArray.push_back(valToPush);
+                } else if (elemSize == 64) {
+                    valToPush = indexVector[i*8];
+                    valToPush = valToPush | (((uint64_t) indexVector[i*8]+1 << 8);
+                    valToPush = valToPush | (((uint64_t) indexVector[i*8]+2 << 16);
+                    valToPush = valToPush | (((uint64_t) indexVector[i*8]+3 << 24);
+                    valToPush = valToPush | (((uint64_t) indexVector[i*8]+4 << 32);
+                    valToPush = valToPush | (((uint64_t) indexVector[i*8]+5 << 40);
+                    valToPush = valToPush | (((uint64_t) indexVector[i*8]+6 << 48);
+                    valToPush = valToPush | (((uint64_t) indexVector[i*8]+7 << 56);
+                    // can't sign extend 64 bits
+                    //valueArray.push_back(valToPush);
+                } else {
+                    //error condition
+                    //error out with helpful info
+                }
+                // lsl shift amount
+                valToPush = valToPush << shiftAmount;
+                // z reg + immediate
+                valToPush = valToPush + immediate;
+                // above plus base address
+                valToPush = valToPush + baseAddress;
+                valueArray.push_back(valToPush);
             }
-            // Is memvecflag true for sve type instructions??
-            // definitely  want true
+
+            // TODO remove when nolonger necessary?
+            assert(valueArray.size() == numOfElems);
+
+            length = 0;
+            // loop over predicate register
+            for (int index=0;index<numElems;index++) {
+                uint64_t curAddress = valueArray[index];
+
+                uint16_t byteToCheckIndex = (index*elemSize)/64;
+                uint8_t byteToCheck = predReg[byteToCheckIndex];
+                uint8_t bitToCheck = (index*elemSize/8)%8;
+
+                bool isOn = (byteToCheck & (1<<bitToCheck)) !=0;
+                if (isOn) {
+                    stats->addressesForProcessing[length] = curAddress;
+                    length++;
+                }
+            }
+            
+            memvecFlag = true;
 
         // end of epax indirect address
         }
