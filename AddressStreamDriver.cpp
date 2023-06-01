@@ -279,6 +279,9 @@ void* AddressStreamDriver::FinalizeImage(image_key_t* key) {
           AddressStreamTool* currentTool = (*it);
           currentTool->FinalizeTool(allData, sampler);
     }
+
+    if(HasLiveInstrumentationPoints())
+        ShutOffInstrumentationInAllBlocks();
     
     double t = (allData->GetTimer(*key, 1) - allData->GetTimer(*key, 0));
     inform << "CXXX Total Execution time for instrumented application " 
