@@ -637,7 +637,7 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
         } else if (reference->type == EPAX_VECTOR_ENTRY) {
             // Figure out and document well in code and or wiki wtflip 
             // memvecflag means
-            // TODO set maxNumAddresses to 256
+
             // x0 in above access
             uint64_t memAddress = reference->epaxVectorAddress.memAddress;
             // in bytes
@@ -673,9 +673,7 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                     length++;
                 }
             }
-            // Is memvecflag true for sve type instructions??
-            // probably want true TODO (ask AT)
-            memvecFlag = true;
+            memvecFlag = false;
 
         // end of epax vectory entry
         // epax indirect address generally of the form
