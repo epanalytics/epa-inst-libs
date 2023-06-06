@@ -628,7 +628,12 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
         // Were x0 is the base address, generally of some array, and x1 is the
         // current count of elements into the array (optionally lsl by 3 so users
         // can count by 1s instead of by 8s, or just an immediate, which indicates
-        // a vector length multiple to offset off of x0
+        // a vector length multiple to offset off of x0. The way the addresses 
+        // are calculated is that the first address is what is contained in the 
+        // brackets, we then you mMemElemSize to find out where the next address
+        // to be loaded is and we use numElems to know how many times to repeat 
+        // this process using the predicate values as the final
+        // deciding factor of whether or not the address is actually accessed
         } else if (reference->type == EPAX_VECTOR_ENTRY) {
             // Figure out and document well in code and or wiki wtflip 
             // memvecflag means
@@ -699,19 +704,19 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
             // the predicate register bytes for predicated instructions.
             uint8_t* predReg = reference->epaxIndirectAddress.predReg;
             // the sve z register that we used to calculate the memory address
-            uint8_t* indexVector = reference->epaxIndirectAddress.indexVector;
+            uint8_t* baseVector = reference->epaxIndirectAddress.baseVector;
             // in bits
             uint32_t VecLen = stats->SVEVectorLength;
             // in bits
             uint32_t elemSize = VecLen/numElements;
             std::vector<uint64_t> valueArray;
-            // Since indexVector is just an array of bytes, and not an array
+            // Since baseVector is just an array of bytes, and not an array
             // of the appropriately sized ints, we have to do some bit 
             // manipulation to get the correct values
             for (size_t i = 0 ; i < numElements; i++) {
                 uint64_t valToPush;
                 if (elemSize == 8) {
-                    valToPush = (uint64_t) indexVector[i];
+                    valToPush = (uint64_t) baseVector[i];
                     // if we do a sign extension, back fill with 1s if we have
                     // a 1 in the most significant bit
                     if (doesExtension == 1 && signedExtension == 1) {
@@ -721,8 +726,8 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                         }
                     }
                 } else if (elemSize == 16) {
-                    valToPush = indexVector[i*2];
-                    valToPush |= (((uint64_t) indexVector[i*2]+1) << 8);
+                    valToPush = baseVector[i*2];
+                    valToPush |= (((uint64_t) baseVector[i*2]+1) << 8);
                     if (doesExtension == 1 && signedExtension == 1) {
                         uint16_t bitToExtend = valToPush & 0x8000;
                         if (bitToExtend !=0) { // fill with 1s
@@ -730,10 +735,10 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                         }
                     }
                 } else if (elemSize == 32) {
-                    valToPush = indexVector[i*4];
-                    valToPush |= (((uint64_t) indexVector[i*4]+1) << 8);
-                    valToPush |= (((uint64_t) indexVector[i*4]+2) << 16);
-                    valToPush |= (((uint64_t) indexVector[i*4]+3) << 24);
+                    valToPush = baseVector[i*4];
+                    valToPush |= (((uint64_t) baseVector[i*4]+1) << 8);
+                    valToPush |= (((uint64_t) baseVector[i*4]+2) << 16);
+                    valToPush |= (((uint64_t) baseVector[i*4]+3) << 24);
                     if (doesExtension == 1 && signedExtension == 1) {
                         uint32_t bitToExtend = valToPush & 0x80000000;
                         if (bitToExtend !=0) { // fill with 1s
@@ -741,14 +746,14 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                         }
                     }
                 } else if (elemSize == 64) {
-                    valToPush = indexVector[i*8];
-                    valToPush |= (((uint64_t) indexVector[i*8]+1) << 8);
-                    valToPush |= (((uint64_t) indexVector[i*8]+2) << 16);
-                    valToPush |= (((uint64_t) indexVector[i*8]+3) << 24);
-                    valToPush |= (((uint64_t) indexVector[i*8]+4) << 32);
-                    valToPush |= (((uint64_t) indexVector[i*8]+5) << 40);
-                    valToPush |= (((uint64_t) indexVector[i*8]+6) << 48);
-                    valToPush |= (((uint64_t) indexVector[i*8]+7) << 56);
+                    valToPush = baseVector[i*8];
+                    valToPush |= (((uint64_t) baseVector[i*8]+1) << 8);
+                    valToPush |= (((uint64_t) baseVector[i*8]+2) << 16);
+                    valToPush |= (((uint64_t) baseVector[i*8]+3) << 24);
+                    valToPush |= (((uint64_t) baseVector[i*8]+4) << 32);
+                    valToPush |= (((uint64_t) baseVector[i*8]+5) << 40);
+                    valToPush |= (((uint64_t) baseVector[i*8]+6) << 48);
+                    valToPush |= (((uint64_t) baseVector[i*8]+7) << 56);
                     // can't sign extend 64 bits
                 } else {
                     //error condition

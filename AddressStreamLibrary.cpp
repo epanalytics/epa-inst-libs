@@ -286,7 +286,12 @@ AddressStreamStats* GenerateStreamStats(AddressStreamStats* stats, uint32_t typ,
 
     // Initialize with other run data
     // TODO set depending on if it is pebil or epax
+    #ifdef EPAX_INST_TOOL
     stats->maxNumAddresses = 256;
+    #else
+    // TODO what is maximum amount possible under avx512?
+    stats->maxNumAddresses = 64;
+    #endif
     stats->addressesForProcessing = (uint64_t*)malloc((sizeof(uint64_t) *
       stats->maxNumAddresses));
 
