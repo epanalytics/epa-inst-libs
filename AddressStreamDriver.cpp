@@ -622,19 +622,31 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                 }
             }
         // end of if vector entry
+        // epax vector entry, either in the form of
+        // ld1d z0.d, p0/z, [x0, #1, mul vl] or 
+        // ld1d z1.d, p0/z, [x0, x1, LSL #3]
+        // Were x0 is the base address, generally of some array, and x1 is the
+        // current count of elements into the array (optionally lsl by 3 so users
+        // can count by 1s instead of by 8s, or just an immediate, which indicates
+        // a vector length multiple to offset off of x0
         } else if (reference->type == EPAX_VECTOR_ENTRY) {
             // Figure out and document well in code and or wiki wtflip 
             // memvecflag means
             // TODO set maxNumAddresses to 256
+            // x0 in above access
             uint64_t memAddress = reference->epaxVectorAddress.memAddress;
             // in bytes
             uint64_t mAccess = reference->epaxVectorAddress.sizeOfAccess/8;
+            // the predicate register bytes for predicated instructions.
             uint8_t* predReg = reference->epaxVectorAddress.predReg;
+            // the number of elements to load into the z register
             uint16_t numElems = reference->epaxVectorAddress.numElements;
-            // in bytes
+            // in bytes, differs between mRegElemSize as we sometimes sign extend
+            // values
             uint16_t mMemElemSize = mAccess/numElems;
-            uint32_t vecLen = stats->SVEVectorLength/8;
             // in bytes
+            uint32_t vecLen = stats->SVEVectorLength/8;
+            // in bytes, the size of the z register elements
             uint16_t mRegElemSize = vecLen/numElems;
             length = 0;
             // index into the z register
@@ -642,7 +654,6 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                 // need to use this information to fill up 
                 // stats->addressForProcessing as well as creating the length
                 // variable
-                //
                 uint64_t curAddress = memAddress + (index*mMemElemSize);
 
                 uint16_t byteToCheckIndex = (index*mRegElemSize)/8;
@@ -661,30 +672,48 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
             // probably want true TODO (ask AT)
             memvecFlag = true;
 
-
         // end of epax vectory entry
+        // epax indirect address generally of the form
+        // ld1d z0.d, p0/z, [x0, z1.d] where x0 is the base and z1 contains 
+        // elements of 64 bits (d is for double) that represent and index value
+        // to add to x0 for the final address to load.
         } else if (reference->type == EPAX_INDIRECT_ENTRY) {
+            // x0
             uint64_t baseAddress = reference->epaxIndirectAddress.baseAddress;
+            // some times we need to sign or unsign extend the values in z1
             uint8_t doesExtension =
               reference->epaxIndirectAddress.doesExtension;
             uint8_t signedExtension =
               reference->epaxIndirectAddress.signedExtend;
+            // after doing the sign extend, if there is one, we sometimes need
+            // to do a lsl and this is the amount to do. If there is no lsl,
+            // this value is 0 as a lsl of 0 is the same final value.
             uint8_t shiftAmount = reference->epaxIndirectAddress.shiftAmount;
+            // sometimes we see instructions in the form 
+            // ld1d z0.d, p0/z, [z1.d, #8], in which case base address would be
+            // 0, no extension, no lsl, and we would just add 8 to each of the 
+            // double values contained within the register z1.
             uint8_t immediate = reference->epaxIndirectAddress.immediate;
-            // is this register side or memory side or both?
+            // the number of elements that will be loaded or stored.
             uint16_t numElements = reference->epaxIndirectAddress.numElements;
+            // the predicate register bytes for predicated instructions.
             uint8_t* predReg = reference->epaxIndirectAddress.predReg;
+            // the sve z register that we used to calculate the memory address
             uint8_t* indexVector = reference->epaxIndirectAddress.indexVector;
             // in bits
             uint32_t VecLen = stats->SVEVectorLength;
             // in bits
             uint32_t elemSize = VecLen/numElements;
             std::vector<uint64_t> valueArray;
+            // Since indexVector is just an array of bytes, and not an array
+            // of the appropriately sized ints, we have to do some bit 
+            // manipulation to get the correct values
             for (size_t i = 0 ; i < numElements; i++) {
                 uint64_t valToPush;
                 if (elemSize == 8) {
-                    //valueArray.push_back((uint64_t) indexVector[i]);
                     valToPush = (uint64_t) indexVector[i];
+                    // if we do a sign extension, back fill with 1s if we have
+                    // a 1 in the most significant bit
                     if (doesExtension == 1 && signedExtension == 1) {
                         uint8_t bitToExtend = valToPush & 0x80; // signBit
                         if (bitToExtend != 0) { // fill with 1s
@@ -700,7 +729,6 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                             valToPush | 0xffffffffffff0000;
                         }
                     }
-                    //valueArray.push_back(valToPush);
                 } else if (elemSize == 32) {
                     valToPush = indexVector[i*4];
                     valToPush |= (((uint64_t) indexVector[i*4]+1) << 8);
@@ -712,7 +740,6 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                             valToPush | 0xffffffff00000000;
                         }
                     }
-                    //valueArray.push_back(valToPush);
                 } else if (elemSize == 64) {
                     valToPush = indexVector[i*8];
                     valToPush |= (((uint64_t) indexVector[i*8]+1) << 8);
@@ -723,13 +750,14 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                     valToPush |= (((uint64_t) indexVector[i*8]+6) << 48);
                     valToPush |= (((uint64_t) indexVector[i*8]+7) << 56);
                     // can't sign extend 64 bits
-                    //valueArray.push_back(valToPush);
                 } else {
                     //error condition
                     //error out with helpful info
                     // TODO
                     assert(false);
                 }
+                // Most of the below values will be 0 with possibly 1 value not
+                // being 0.
                 // lsl shift amount
                 valToPush = valToPush << shiftAmount;
                 // z reg + immediate
@@ -763,7 +791,7 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
         // end of epax indirect address
         }
 
-        // check if we need to set maxNumAddresses somehwere TODO 
+        // check if we need to set maxNumAddresses somehwere
         // We can potentially have a possible maximum of 256 1 byte elements
         debug(assert(length <= maxNumAddresses));
 

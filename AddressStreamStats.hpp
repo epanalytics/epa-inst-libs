@@ -43,7 +43,8 @@ enum EntryType: uint8_t {
   EntryType_Total
 };
 
-struct VectorAddress {
+// pebil only
+struct VectorAddress { 
     uint32_t indexVector[16];
     uint8_t  scale;
     uint64_t base;
@@ -51,22 +52,27 @@ struct VectorAddress {
     uint32_t  numIndices;
 };
 
-// EPAX-only. For use with SVE that do a contiguous memory access.
+// EPAX-only. For use with SVE memops that do a contiguous memory access.
 // The addressing modes are called:
 // 1. Scalar plus immediate
-// 2. Scalar plus scale
+// 2. Scalar plus scalar
 // Since this is a contiguous memory access, you only need the first address
 // accessed and how much it accesses. Use the number of elements to process
-// each accessed address. Use the number of elements (TODO - is this right,
-// Emmet) to determine which mask bits to use.
+// each accessed address. Use the number of elements to determine which mask 
+// bits to use.
 struct EPAXVectorAddress {
     uint64_t memAddress;    // First Address in contiguous mem access
-    uint64_t sizeOfAccess;  // Size of mem access in (bits?)
+    uint64_t sizeOfAccess;  // Size of mem access in bits
     uint16_t numElements;   // Number of addresses accessed
+    // 2048 vector bits / 8 bits = 256 bytes. 
+    // 1 Predicate byte represents 8 vector bytes, 256/8=32 predicate bytes needed
+    // predReg holds the raw byte values that were in the predicate register
+    // for predicated sve memory accesses, we allocate space for the maximum
+    // possible number of predicate bytes possible.
     uint8_t predReg[32];    // 2048/64
 };
 
-// EPAX-only. For use with SVE that do a scatter/gather memory access.
+// EPAX-only. For use with SVE memops that do a scatter/gather memory access.
 // The addressing modes are called:
 // 1. Scalar plus vector
 // 2. Vector plus immediate
@@ -74,16 +80,24 @@ struct EPAXVectorAddress {
 // the given values. Scalar + vector uses a base address, may sign extend and/or
 // shift the given index value and then add the values together. Vector +
 // immediate does not use a base address and instead adds an immediate to each
-// index in the vector.
+// value in the given vector
 struct EPAXIndirectAddress {
     uint64_t baseAddress;   // scalar + vec: Value of Xn OR 0
     bool doesExtension;     // scalar + vec: do a signed or unsigned extension
     bool signedExtend;      // scalar + vec: signedExtend or unsignedExtend
     uint8_t shiftAmount;    // scalar + vec: How much to shift index
     uint64_t immediate;     // vector + imm: offset * mbytes OR 0
-    uint16_t numElements;   // Number of elements in index vector
-    uint8_t predReg[32];    // 2048/64
-    uint8_t indexVector[256];   // 2048/8 
+    // see ARM documentation
+    uint16_t numElements;   // Number of addresses accessed
+    // 2048 vector bits / 8 bits = 256 bytes. 
+    // 1 Predicate byte represents 8 vector bytes, 256/8=32 predicate bytes needed
+    // for predicated sve memory accesses, we allocate space for the maximum
+    // possible number of predicate bytes possible.
+    uint8_t predReg[32];    
+    // The vector register maximum possible length, can be any value between
+    // 256 and 2048 at intervals of 256 bits. We allocate space for the maximum
+    // possible number of z register bytes.
+    uint8_t baseVector[256];   // 2048/8 see above
 };
 
 typedef struct BufferEntry_s {
