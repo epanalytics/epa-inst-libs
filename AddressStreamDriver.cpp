@@ -615,55 +615,54 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                 for (int i = 1; i < length; i++) {
                     if (dataCentricSeq != GET_DATA_STRUCTURE_ID(
                       dataStructureModule, stats->addressesForProcessing[i],
-                        false))
+                      false)) {
+
                         fprintf(stderr, "WARNING: Multiple data structures in "
                           "a vector...data will be a little off. The fix will "
                           "require a small refactor.\n");
+                    }
                 }
             }
         // end of if vector entry
         // epax vector entry, either in the form of
-        // ld1d z0.d, p0/z, [x0, #1, mul vl] or 
-        // ld1d z1.d, p0/z, [x0, x1, LSL #3]
+        // ld1d z1.d, p0/z, [x0, x1, LSL #3] or
+        // ld1d z0.d, p0/z, [x0, #1, mul vl]
         // Were x0 is the base address, generally of some array, and x1 is the
         // current count of elements into the array (optionally lsl by 3 so users
         // can count by 1s instead of by 8s, or just an immediate, which indicates
         // a vector length multiple to offset off of x0. The way the addresses 
         // are calculated is that the first address is what is contained in the 
-        // brackets, we then you mMemElemSize to find out where the next address
+        // brackets, we then use memElemSize to find out where the next address
         // to be loaded is and we use numElems to know how many times to repeat 
         // this process using the predicate values as the final
         // deciding factor of whether or not the address is actually accessed
         } else if (reference->type == EPAX_VECTOR_ENTRY) {
-            // Figure out and document well in code and or wiki wtflip 
-            // memvecflag means
-
             // x0 in above access
             uint64_t memAddress = reference->epaxVectorAddress.memAddress;
             // in bytes
-            uint64_t mAccess = reference->epaxVectorAddress.sizeOfAccess/8;
+            uint64_t access = reference->epaxVectorAddress.sizeOfAccess/8;
             // the predicate register bytes for predicated instructions.
             uint8_t* predReg = reference->epaxVectorAddress.predReg;
             // the number of elements to load into the z register
             uint16_t numElems = reference->epaxVectorAddress.numElements;
-            // in bytes, differs between mRegElemSize as we sometimes sign extend
+            // in bytes, differs between regElemSize as we sometimes sign extend
             // values
-            uint16_t mMemElemSize = mAccess/numElems;
+            uint16_t memElemSize = access/numElems;
             // in bytes
             uint32_t vecLen = stats->SVEVectorLength/8;
             // in bytes, the size of the z register elements
-            uint16_t mRegElemSize = vecLen/numElems;
+            uint16_t regElemSize = vecLen/numElems;
             length = 0;
             // index into the z register
             for (int index=0;index<numElems;index++) { // loop over predReg
                 // need to use this information to fill up 
                 // stats->addressForProcessing as well as creating the length
                 // variable
-                uint64_t curAddress = memAddress + (index*mMemElemSize);
+                uint64_t curAddress = memAddress + (index*memElemSize);
 
-                uint16_t byteToCheckIndex = (index*mRegElemSize)/8;
+                uint16_t byteToCheckIndex = (index*regElemSize)/8;
                 uint8_t byteToCheck = predReg[byteToCheckIndex];
-                uint8_t bitToCheck = (index*mRegElemSize)%8;
+                uint8_t bitToCheck = (index*regElemSize)%8;
 
                 // don't really need the last != check but just for sanity
                 // make sure I don't have a off by 1 error
@@ -675,11 +674,28 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
             }
             memvecFlag = false;
 
+            if (runDataCentric) {
+                dataCentricSeq = GET_DATA_STRUCTURE_ID(dataStructureModule, 
+                  stats->addressesForProcessing[0], false);
+                // Check if we have addresses from different data structures --
+                // If so, we're gonna need to refactor
+                for (int i = 1; i < length; i++) {
+                    if (dataCentricSeq != GET_DATA_STRUCTURE_ID(
+                      dataStructureModule, stats->addressesForProcessing[i],
+                      false)) {
+
+                        fprintf(stderr, "WARNING: Multiple data structures in "
+                          "a vector...data will be a little off. The fix will "
+                          "require a small refactor.\n");
+                    }
+                }
+            }
         // end of epax vectory entry
         // epax indirect address generally of the form
-        // ld1d z0.d, p0/z, [x0, z1.d] where x0 is the base and z1 contains 
-        // elements of 64 bits (d is for double) that represent and index value
-        // to add to x0 for the final address to load.
+        // ld1d z0.d, p0/z, [z1.d, #8] where is #8 is a fixed offset or,
+        // ld1d z0.d, p0/z, [x0, z1.d] where x0 is the base and z1 (for both)
+        // contains elements of 64 bits (d is for double) that represent and 
+        // index value to add to x0 for the final address to load.
         } else if (reference->type == EPAX_INDIRECT_ENTRY) {
             // x0
             uint64_t baseAddress = reference->epaxIndirectAddress.baseAddress;
@@ -791,11 +807,25 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
             
             memvecFlag = true;
 
+            if (runDataCentric) {
+                dataCentricSeq = GET_DATA_STRUCTURE_ID(dataStructureModule, 
+                  stats->addressesForProcessing[0], false);
+                // Check if we have addresses from different data structures --
+                // If so, we're gonna need to refactor
+                for (int i = 1; i < length; i++) {
+                    if (dataCentricSeq != GET_DATA_STRUCTURE_ID(
+                      dataStructureModule, stats->addressesForProcessing[i],
+                      false)) {
+
+                        fprintf(stderr, "WARNING: Multiple data structures in "
+                          "a vector...data will be a little off. The fix will "
+                          "require a small refactor.\n");
+                    }
+                }
+            }
         // end of epax indirect address
         }
 
-        // check if we need to set maxNumAddresses somehwere
-        // We can potentially have a possible maximum of 256 1 byte elements
         debug(assert(length <= maxNumAddresses));
 
         // Process for each memory handler
