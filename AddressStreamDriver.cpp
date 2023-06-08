@@ -725,7 +725,7 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                     }
                 } else if (elemSize == 16) {
                     valToPush = baseVector[i*2];
-                    valToPush |= (((uint64_t) baseVector[i*2]+1) << 8);
+                    valToPush |= (((uint64_t) baseVector[(i*2)+1]) << 8);
                     if (doesExtension == 1 && signedExtension == 1) {
                         uint16_t bitToExtend = valToPush & 0x8000;
                         if (bitToExtend !=0) { // fill with 1s
@@ -734,9 +734,9 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                     }
                 } else if (elemSize == 32) {
                     valToPush = baseVector[i*4];
-                    valToPush |= (((uint64_t) baseVector[i*4]+1) << 8);
-                    valToPush |= (((uint64_t) baseVector[i*4]+2) << 16);
-                    valToPush |= (((uint64_t) baseVector[i*4]+3) << 24);
+                    valToPush |= (((uint64_t) baseVector[(i*4)+1]) << 8);
+                    valToPush |= (((uint64_t) baseVector[(i*4)+2]) << 16);
+                    valToPush |= (((uint64_t) baseVector[(i*4)+3]) << 24);
                     if (doesExtension == 1 && signedExtension == 1) {
                         uint32_t bitToExtend = valToPush & 0x80000000;
                         if (bitToExtend !=0) { // fill with 1s
@@ -745,13 +745,13 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                     }
                 } else if (elemSize == 64) {
                     valToPush = baseVector[i*8];
-                    valToPush |= (((uint64_t) baseVector[i*8]+1) << 8);
-                    valToPush |= (((uint64_t) baseVector[i*8]+2) << 16);
-                    valToPush |= (((uint64_t) baseVector[i*8]+3) << 24);
-                    valToPush |= (((uint64_t) baseVector[i*8]+4) << 32);
-                    valToPush |= (((uint64_t) baseVector[i*8]+5) << 40);
-                    valToPush |= (((uint64_t) baseVector[i*8]+6) << 48);
-                    valToPush |= (((uint64_t) baseVector[i*8]+7) << 56);
+                    valToPush |= (((uint64_t) baseVector[(i*8)+1]) << 8);
+                    valToPush |= (((uint64_t) baseVector[(i*8)+2]) << 16);
+                    valToPush |= (((uint64_t) baseVector[(i*8)+3]) << 24);
+                    valToPush |= (((uint64_t) baseVector[(i*8)+4]) << 32);
+                    valToPush |= (((uint64_t) baseVector[(i*8)+5]) << 40);
+                    valToPush |= (((uint64_t) baseVector[(i*8)+6]) << 48);
+                    valToPush |= (((uint64_t) baseVector[(i*8)+7]) << 56);
                     // can't sign extend 64 bits
                 } else {
                     //error condition
