@@ -64,12 +64,11 @@ struct EPAXVectorAddress {
     uint64_t memAddress;    // First Address in contiguous mem access
     uint64_t sizeOfAccess;  // Size of mem access in bits
     uint16_t numElements;   // Number of addresses accessed
-    // 2048 vector bits / 8 bits = 256 bytes. 
-    // 1 Predicate byte represents 8 vector bytes, 256/8=32 predicate bytes needed
-    // predReg holds the raw byte values that were in the predicate register
-    // for predicated sve memory accesses, we allocate space for the maximum
-    // possible number of predicate bytes possible.
-    uint8_t predReg[32];    // 2048/64
+    // The value of the predicate register
+    // Allocate maximum length of predicate register == SVE VL / 64
+    // (1 bit for each byte of the SVE Vector Length)
+    // Max SVE VL == 2048; Max P Reg length == 2048 / 64 == 32
+    uint8_t predReg[32];
 };
 
 // EPAX-only. For use with SVE memops that do a scatter/gather memory access.
@@ -87,17 +86,17 @@ struct EPAXIndirectAddress {
     bool signedExtend;      // scalar + vec: signedExtend or unsignedExtend
     uint8_t shiftAmount;    // scalar + vec: How much to shift index
     uint64_t immediate;     // vector + imm: offset * mbytes OR 0
-    // see ARM documentation
+                            // (see ARM documentation)
     uint16_t numElements;   // Number of addresses accessed
-    // 2048 vector bits / 8 bits = 256 bytes. 
-    // 1 Predicate byte represents 8 vector bytes, 256/8=32 predicate bytes needed
-    // for predicated sve memory accesses, we allocate space for the maximum
-    // possible number of predicate bytes possible.
-    uint8_t predReg[32];    
-    // The vector register maximum possible length, can be any value between
-    // 256 and 2048 at intervals of 256 bits. We allocate space for the maximum
-    // possible number of z register bytes.
-    uint8_t baseVector[256];   // 2048/8 see above
+    // The value of the predicate register
+    // Allocate maximum length of predicate register in bytes == SVE VL / 64
+    // (1 bit for each byte of the SVE Vector Length)
+    // Max SVE VL == 2048; Max P Reg length == 2048 / 64 == 32
+    uint8_t predReg[32];
+    // The value of the Z register in the memory operand (base or index vector)
+    // Allocate maximum length of Z register in bytes == SVE VL / 8
+    // Max SVE VL == 2048; Max Z Reg length == 2048 / 8  == 256
+    uint8_t baseVector[256];
 };
 
 typedef struct BufferEntry_s {
@@ -109,8 +108,10 @@ typedef struct BufferEntry_s {
     union {
         uint64_t address;        // value simulated
         struct VectorAddress vectorAddress;
+#ifdef  EPAX_INST_TOOL
         struct EPAXVectorAddress epaxVectorAddress;
         struct EPAXIndirectAddress epaxIndirectAddress;
+#endif
     };
     //uint64_t    threadid;        // Error-checking
 } BufferEntry;
