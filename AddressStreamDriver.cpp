@@ -628,8 +628,7 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
         // ld1d z0.d, p0/z, [x0, #1, mul vl]     (scalar plus immediate)
         // Were x0 is the base address and x1 is an index (optionally shifted
         // so index can go by 1 instead of by datatype size).
-        // Immediates are ???
-        // a vector length multiple to offset off of x0.
+        // Immediates are offsets that are multiplied by the vector length.
         //
         // We are given the base address, the maximum amount accessed (i.e.,
         // before predication), and the number of addresses accessed. From this,
