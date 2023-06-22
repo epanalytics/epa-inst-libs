@@ -635,6 +635,7 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
         // we can calculate which addresses are accessed. Then, we use the
         // given predicate register value to calculate which addresses were
         // actually loaded/stored.
+#ifdef EPAX_INST_TOOL
         } else if (reference->type == EPAX_VECTOR_ENTRY) {
             // The first address accessed (x0 in examples)
             uint64_t memAddress = reference->epaxVectorAddress.memAddress;
@@ -865,6 +866,7 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                     }
                 }
             }
+#endif // EPAX_INST_TOOL
         } // end of epax indirect address
 
         debug(assert(length <= maxNumAddresses));
