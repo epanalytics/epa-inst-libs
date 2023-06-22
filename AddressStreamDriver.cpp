@@ -279,6 +279,9 @@ void* AddressStreamDriver::FinalizeImage(image_key_t* key) {
           AddressStreamTool* currentTool = (*it);
           currentTool->FinalizeTool(allData, sampler);
     }
+
+    if(HasLiveInstrumentationPoints())
+        ShutOffInstrumentationInAllBlocks();
     
     double t = (allData->GetTimer(*key, 1) - allData->GetTimer(*key, 0));
     inform << "CXXX Total Execution time for instrumented application " 
@@ -565,7 +568,6 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
         uint64_t memSeq = reference->memseq;
         uint64_t dataCentricSeq = reference->memseq;
         bool ldstFlag = reference->loadstoreflag;
-        // I have a hunch most will be false so default to that
         bool memvecFlag = false; 
         // for single memory entry, length is one
         uint64_t length = 1;
@@ -612,13 +614,258 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                 for (int i = 1; i < length; i++) {
                     if (dataCentricSeq != GET_DATA_STRUCTURE_ID(
                       dataStructureModule, stats->addressesForProcessing[i],
-                        false))
+                      false)) {
+
                         fprintf(stderr, "WARNING: Multiple data structures in "
                           "a vector...data will be a little off. The fix will "
                           "require a small refactor.\n");
+                    }
                 }
             }
-        }// end of if vector entry
+        // If EPAX_VECTOR_ENTRY: a masked contiguous vector memop
+        // Currently either takes the form of
+        // ld1d z1.d, p0/z, [x0, x1, LSL #3] or  (scalar plus scalar)
+        // ld1d z0.d, p0/z, [x0, #1, mul vl]     (scalar plus immediate)
+        // Were x0 is the base address and x1 is an index (optionally shifted
+        // so index can go by 1 instead of by datatype size).
+        // Immediates are offsets that are multiplied by the vector length.
+        //
+        // We are given the base address, the maximum amount accessed (i.e.,
+        // before predication), and the number of addresses accessed. From this,
+        // we can calculate which addresses are accessed. Then, we use the
+        // given predicate register value to calculate which addresses were
+        // actually loaded/stored.
+        } else if (reference->type == EPAX_VECTOR_ENTRY) {
+            // The first address accessed (x0 in examples)
+            uint64_t memAddress = reference->epaxVectorAddress.memAddress;
+            // Amount accessed in bytes
+            uint64_t access = reference->epaxVectorAddress.sizeOfAccess / 8;
+            // Number of elements accessed
+            uint16_t numElems = reference->epaxVectorAddress.numElements;
+            // Value of the predicate register (note: stored as bytes)
+            uint8_t* predReg = reference->epaxVectorAddress.predReg;
+            // Size of *accessed* datatype in bytes
+            uint16_t memElemSize = access / numElems;
+            // SVE vector length in bytes
+            uint32_t vecLen = stats->SVEVectorLength / 8;
+            // Size of Z register datatype in bytes (not the same as accessed
+            // datatype! There could be a datatype conversion)
+            uint16_t regElemSize = vecLen / numElems;
+
+            // for epax_vector_entry, length is determined by the mask.
+            length = 0;
+            // For each memory address accessed, calculate the address.
+            // Then, check the predicate to see if the address was
+            // loaded/stored. If so, add it to the addressesForProcessing.
+            for (int elemNum = 0; elemNum < numElems; elemNum++) {
+                // Calculate the address accessed in memory
+                uint64_t curAddress = memAddress + (elemNum * memElemSize);
+
+                // Figure out which is the corresponding bit in the predicate
+                // register. If the Z register datatype is 1 byte, then each
+                // bit in the predicate register corresponds to an element in
+                // the Z register. If the datatype is 2 bytes, then it is every
+                // other bit. 4 bytes - every 4 bits. 8 bytes - every 8 bits.
+                //
+                // Pred reg is stored as 8 bits to an element. First figure out
+                // which element of the pred reg we want, and then which bit
+                // in that element is the corresponding one.
+                uint16_t predRegElemToCheck = (elemNum * regElemSize) / 8;
+                uint8_t predRegElem = predReg[predRegElemToCheck];
+                uint8_t bitToCheck = (elemNum * regElemSize) % 8;
+
+                // If corresponding bit is 1, then we access this address
+                bool isOn = (predRegElem & (1 << bitToCheck)) != 0;
+                if (isOn) {
+                    stats->addressesForProcessing[length] = curAddress;
+                    length++;
+                }
+            } // For each memory address accessed
+            memvecFlag = false;
+
+            if (runDataCentric) {
+                dataCentricSeq = GET_DATA_STRUCTURE_ID(dataStructureModule, 
+                  stats->addressesForProcessing[0], false);
+                // Check if we have addresses from different data structures --
+                // This should NOT happen since this a contiguous mem op
+                for (int i = 1; i < length; i++) {
+                    if (dataCentricSeq != GET_DATA_STRUCTURE_ID(
+                      dataStructureModule, stats->addressesForProcessing[i],
+                      false)) {
+
+                        fprintf(stderr, "WARNING: Multiple data structures in "
+                          "a vector...data will be a little off. This probably "
+                          "should not be happening with this memory type.\n");
+                    }
+                }
+            }
+        // If EPAX_INDIRECT_ENTRY: a masked indirect vector memop (i.e.,
+        // scatter and gathers)
+        // Currently either takes the form of
+        // ld1d z0.d, p0/z, [z1.d, #N]   (vector plus immediate)
+        //   where z1 is a vector of base addresses and #N is a fixed offset
+        // ld1d z0.d, p0/z, [x0, z1.d]   (scalar plus vector)
+        //  where x0 is a base address and z1 is an index (optionally extended
+        //  and/or shifted)
+        //
+        // For the vector plus immediate case, we are given the base vector
+        // (z1 in the example) and the immediate to add to each value in the
+        // base vector.
+        // For the scalar plus scalar case, we are given the base address (x0
+        // in the example), the index vector (z1 in the example), and whether
+        // to sign extend/shift the index.
+        // We are also given the number if addresses accessed (before
+        // predication), and value of the predicate register so we can
+        // determine which addresses were actually loaded/stored.
+        } else if (reference->type == EPAX_INDIRECT_ENTRY) {
+            // The base address, if it has one (otherwise it is 0)
+            uint64_t baseAddress = reference->epaxIndirectAddress.baseAddress;
+            // Does the index need to be extended?
+            uint8_t doesExtension =
+              reference->epaxIndirectAddress.doesExtension;
+            // If the index is extended, is it signed or unsigned
+            uint8_t signedExtension =
+              reference->epaxIndirectAddress.signedExtend;
+            // Amount to shift the index (after any extension) -- 0 is no shift
+            uint8_t shiftAmount = reference->epaxIndirectAddress.shiftAmount;
+            // Amount to add to base address (in vector plus immediate case)
+            // 0 if no immediate
+            uint8_t immediate = reference->epaxIndirectAddress.immediate;
+            // The number of elements that will be accessed
+            uint16_t numElements = reference->epaxIndirectAddress.numElements;
+            // Value of the predicate register (note: stored as bytes)
+            uint8_t* predReg = reference->epaxIndirectAddress.predReg;
+            // Value of the Z register (either the base addresses or the
+            // indices) Note: Stored as little endian!
+            uint8_t* baseVector = reference->epaxIndirectAddress.baseVector;
+            // SVE vector length in bits
+            uint32_t vecLen = stats->SVEVectorLength;
+            // Size of Z register datatype in bits (z0 or z1, they should be
+            // the same datatype)
+            uint32_t elemSize = vecLen / numElements;
+
+            // Calculate the addresses that could have been accessed and store
+            // them in a vector (addresses):
+            //    * Convert the Z register (either baseAddresses or indices)
+            //      from little endian (bytes) to big endian (64-bit ints)
+            //      so we can use the value
+            //    * Do a signed extension, if required
+            //    * Do a shift, if required
+            //    * Add it to the immediate, if required
+            //    * Add it to the base address, if required
+            std::vector<uint64_t> addresses;
+            for (size_t i = 0 ; i < numElements; i++) {
+                uint64_t valToPush;
+                if (elemSize == 8) {
+                    valToPush = (uint64_t) baseVector[i];
+                    // if we do a sign extension, back fill with 1s if we have
+                    // a 1 in the most significant bit
+                    if (doesExtension == 1 && signedExtension == 1) {
+                        uint8_t bitToExtend = valToPush & 0x80; // signBit
+                        if (bitToExtend != 0) { // fill with 1s
+                            valToPush | 0xffffffffffffff00;
+                        }
+                    }
+                } else if (elemSize == 16) {
+                    valToPush = baseVector[i*2];
+                    valToPush |= (((uint64_t) baseVector[(i*2)+1]) << 8);
+                    // If the address is supposed to be sign extended
+                    if (doesExtension == 1 && signedExtension == 1) {
+                        uint16_t bitToExtend = valToPush & 0x8000;
+                        if (bitToExtend != 0) { // fill with 1s
+                            valToPush | 0xffffffffffff0000;
+                        }
+                    }
+                } else if (elemSize == 32) {
+                    valToPush = baseVector[i*4];
+                    valToPush |= (((uint64_t) baseVector[(i*4)+1]) << 8);
+                    valToPush |= (((uint64_t) baseVector[(i*4)+2]) << 16);
+                    valToPush |= (((uint64_t) baseVector[(i*4)+3]) << 24);
+                    // If the address is supposed to be sign extended
+                    if (doesExtension == 1 && signedExtension == 1) {
+                        uint32_t bitToExtend = valToPush & 0x80000000;
+                        if (bitToExtend != 0) { // fill with 1s
+                            valToPush | 0xffffffff00000000;
+                        }
+                    }
+                } else if (elemSize == 64) {
+                    valToPush = baseVector[i*8];
+                    valToPush |= (((uint64_t) baseVector[(i*8)+1]) << 8);
+                    valToPush |= (((uint64_t) baseVector[(i*8)+2]) << 16);
+                    valToPush |= (((uint64_t) baseVector[(i*8)+3]) << 24);
+                    valToPush |= (((uint64_t) baseVector[(i*8)+4]) << 32);
+                    valToPush |= (((uint64_t) baseVector[(i*8)+5]) << 40);
+                    valToPush |= (((uint64_t) baseVector[(i*8)+6]) << 48);
+                    valToPush |= (((uint64_t) baseVector[(i*8)+7]) << 56);
+                    // can't sign extend 64 bits
+                } else {
+                    assert(false && "Don't know how to read the Z register" 
+                      " with the given element size");
+                }
+
+                // Do shift: lsl shift amount (if 0, still correct)
+                valToPush = valToPush << shiftAmount;
+                // Add optional immediate (if 0, still correct)
+                // Note: The immediate is offset * mbytes in ARM documentation
+                valToPush = valToPush + immediate;
+                // Add to the base address (if 0, still correct)
+                valToPush = valToPush + baseAddress;
+                // Push the final address!
+                addresses.push_back(valToPush);
+            }
+
+            // TODO remove when nolonger necessary?
+            assert(addresses.size() == numElements);
+
+            // for epax_indirect_entry, length is determined by the mask.
+            length = 0;
+            // For each memory address accessed, check the predicate to see if
+            // the address was loaded/stored. If so, add it to the
+            // addressesForProcessing.
+            for (int elemNum = 0; elemNum < numElements; elemNum++) {
+                // Get the address accessed
+                uint64_t curAddress = addresses[elemNum];
+
+                // Figure out which is the corresponding bit in the predicate
+                // register. If the Z register datatype is 1 byte, then each
+                // bit in the predicate register corresponds to an element in
+                // the Z register. If the datatype is 2 bytes, then it is every
+                // other bit. 4 bytes - every 4 bits. 8 bytes - every 8 bits.
+                //
+                // Pred reg is stored as 8 bits to an element. First figure out
+                // which element of the pred reg we want, and then which bit
+                // in that element is the corresponding one.
+                uint16_t predRegElemToCheck = (elemNum * elemSize) / 64;
+                uint8_t predRegElem = predReg[predRegElemToCheck];
+                uint8_t bitToCheck = (elemNum * (elemSize / 8)) % 8;
+
+                // If corresponding bit is 1, then we access this address
+                bool isOn = (predRegElem & (1 << bitToCheck)) != 0;
+                if (isOn) {
+                    stats->addressesForProcessing[length] = curAddress;
+                    length++;
+                }
+            } // For each memory address accessed
+            
+            memvecFlag = true;
+
+            if (runDataCentric) {
+                dataCentricSeq = GET_DATA_STRUCTURE_ID(dataStructureModule, 
+                  stats->addressesForProcessing[0], false);
+                // Check if we have addresses from different data structures --
+                // If so, we're gonna need to refactor
+                for (int i = 1; i < length; i++) {
+                    if (dataCentricSeq != GET_DATA_STRUCTURE_ID(
+                      dataStructureModule, stats->addressesForProcessing[i],
+                      false)) {
+
+                        fprintf(stderr, "WARNING: Multiple data structures in "
+                          "a vector...data will be a little off. The fix will "
+                          "require a small refactor.\n");
+                    }
+                }
+            }
+        } // end of epax indirect address
 
         debug(assert(length <= maxNumAddresses));
 

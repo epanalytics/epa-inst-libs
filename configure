@@ -626,6 +626,7 @@ enable_option_checking=no
 ac_subst_vars='LTLIBOBJS
 subdirs
 LIBOBJS
+INST_TOOL_FLAGS
 PEBIL_VERBOSE_SLICER
 INST_LIBS_BINDIR
 INST_LIBS_LIBDIR
@@ -3882,6 +3883,7 @@ fi
 
 
 # Get the following flags from a tool configuration
+
 
 
 
