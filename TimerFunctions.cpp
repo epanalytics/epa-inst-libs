@@ -76,9 +76,22 @@ static uint64_t timerCPUFreq=3200000000;
 #define CLOCK_RATE_HZ 3200000000
 
 inline uint64_t read_timestamp_counter(){
-    unsigned low, high;
-    __asm__ volatile ("rdtsc" : "=a" (low), "=d"(high));
-    return ((unsigned long long)low | (((unsigned long long)high) << 32));
+    #if defined(__x86_64__) || defined(__amd64__)
+        unsigned low, high;
+        __asm__ volatile ("rdtsc" : "=a" (low), "=d"(high));
+        return ((unsigned long long)low | (((unsigned long long)high) << 32));
+    #elif defined(__aarch64__)
+        // borrowed from google's microbenchmark cycleclock.h
+        int64_t virtual_timer_value;
+        asm volatile("mrs %0, cntvct_el0" : "=r"(virtual_timer_value));
+        return (uint64_t)virtual_timer_value;
+    #else
+        struct timeval tv;
+        gettimeofday(&tv, nullptr);
+        return ((unsigned long long)(tv.tv_sec) * 1000000 +
+          (unsigned long long)tv.tv_usec);
+    #endif
+    return 0;
 }
 
 static double diffTime(struct timeval t1, struct timeval t2)
@@ -153,19 +166,25 @@ TimerStats* GenerateTimerStats(TimerStats* timers, uint32_t typ, image_key_t iid
 
 
     // see if the FTIMER_CPU_FREQ env var is defined
-    char * ftimeCPU = getenv("FTIMER_CPU_FREQ");
-    if (ftimeCPU != NULL) {
+    #if defined(__x86_64__) || defined(__amd64__)
+        char * ftimeCPU = getenv("FTIMER_CPU_FREQ");
+        if (ftimeCPU != NULL) {
 
-        std::stringstream strStream;
-        strStream << ftimeCPU;
-        strStream >> timerCPUFreq;
-        inform << "Got custom FTIMER_CPU_FREQ ***(in Hz)** from the user :: " 
-          << timerCPUFreq << endl;
-    } else {
-        inform << "***Using the default CPU clock rate to calculate timings****"
-          << CLOCK_RATE_HZ << endl;
-        timerCPUFreq=CLOCK_RATE_HZ;
-    }
+            std::stringstream strStream;
+            strStream << ftimeCPU;
+            strStream >> timerCPUFreq;
+            inform << "Got custom FTIMER_CPU_FREQ ***(in Hz)** from the user"
+              << " :: " << timerCPUFreq << endl;
+        } else {
+            inform << "***Using the default CPU clock rate to calculate "
+              << "timings****" << CLOCK_RATE_HZ << endl;
+            timerCPUFreq=CLOCK_RATE_HZ;
+        }
+    #elif defined(__aarch64__)
+        timerCPUFreq=100000000;
+    #else
+        timerCPUFreq=1000000;
+    #endif
 
     if(shutoffTimers) {
         if (!ReadEnvUint32("FTIMER_ITERS", &shutoffIters)){
@@ -362,7 +381,7 @@ extern "C"
     // Create mutex to ensure that Dynamics is initialized exactly once
     static pthread_mutex_t dynamic_init_mutex = PTHREAD_MUTEX_INITIALIZER;
     // initialize dynamic instrumentation
-    void* tool_dynamic_init(uint64_t* count, DynamicInst** dyn, bool* 
+    void* tool_dynamic_init(uint64_t* count, DynamicInst** dyn, bool*
       isThreadedModeFlag) {
         pthread_mutex_lock(&dynamic_init_mutex);
         if (DynamicPoints == NULL) {

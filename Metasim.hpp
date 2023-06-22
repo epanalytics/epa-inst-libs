@@ -67,13 +67,13 @@ typedef enum {
 
 #define DYNAMIC_POINT_SIZE_LIMIT 128
 typedef struct DynamicInst_s {
-    uint64_t VirtualAddress;
-    uint64_t ProgramAddress;
-    uint64_t Key;
-    uint64_t Flags;
-    uint32_t Size;
-    uint8_t  OppContent[DYNAMIC_POINT_SIZE_LIMIT];
-    bool IsEnabled;
+    uint64_t VirtualAddress;    // Where the inst point is
+    uint64_t ProgramAddress;    // (unused) instrumented insn
+    uint64_t Key;               // ID for this inst pt (can match others)
+    uint64_t Flags;             // Unsused
+    uint32_t Size;              // Size of data to overwrite
+    uint8_t  OppContent[DYNAMIC_POINT_SIZE_LIMIT];  // What to overwrite with
+    bool IsEnabled;             // Enabled or not
 } DynamicInst;
 
 #define GENERATE_UNIQUE_ID(__bid, __iid) ((__bid << 8) | ((__iid & 0xf) << 4))

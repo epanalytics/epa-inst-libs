@@ -285,7 +285,11 @@ AddressStreamStats* GenerateStreamStats(AddressStreamStats* stats, uint32_t typ,
     Driver->InitializeStatsWithNewStreamStats(stats);
 
     // Initialize with other run data
+    #ifdef EPAX_INST_TOOL
+    stats->maxNumAddresses = 256;
+    #else
     stats->maxNumAddresses = 64;
+    #endif
     stats->addressesForProcessing = (uint64_t*)malloc((sizeof(uint64_t) *
       stats->maxNumAddresses));
 
