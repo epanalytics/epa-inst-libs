@@ -57,6 +57,8 @@ typedef enum {
     PointType_buffercheck,
     PointType_bufferinc,
     PointType_bufferfill,
+    PointType_loopEntry,
+    PointType_loopExit,
     PointType_functionEntry,
     PointType_functionExit,
     PointType_inits,
@@ -65,19 +67,19 @@ typedef enum {
 
 #define DYNAMIC_POINT_SIZE_LIMIT 128
 typedef struct DynamicInst_s {
-    uint64_t VirtualAddress;
-    uint64_t ProgramAddress;
-    uint64_t Key;
-    uint64_t Flags;
-    uint32_t Size;
-    uint8_t  OppContent[DYNAMIC_POINT_SIZE_LIMIT];
-    bool IsEnabled;
+    uint64_t VirtualAddress;    // Where the inst point is
+    uint64_t ProgramAddress;    // (unused) instrumented insn
+    uint64_t Key;               // ID for this inst pt (can match others)
+    uint64_t Flags;             // Unsused
+    uint32_t Size;              // Size of data to overwrite
+    uint8_t  OppContent[DYNAMIC_POINT_SIZE_LIMIT];  // What to overwrite with
+    bool IsEnabled;             // Enabled or not
 } DynamicInst;
 
 #define GENERATE_UNIQUE_ID(__bid, __iid) ((__bid << 8) | ((__iid & 0xf) << 4))
 // Generate a key given a block sequence and an image sequence
 #define GENERATE_UNIQUE_KEY(__bid, __iid, __typ) ((__typ & 0xf) | GENERATE_UNIQUE_ID(__bid, __iid))
-// Generate a key given a unique id
+// Generate a key given a unique id (Unique ID must include image sequence!)
 #define GENERATE_KEY(__id, __typ) ((__typ & 0xf) | (__id << 4))
 #define GET_UNIQUEID(__key) ((__key >> 4))
 #define GET_IMAGEID(__key) (((__key & 0xf0)>> 4))

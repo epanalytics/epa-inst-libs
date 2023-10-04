@@ -65,9 +65,22 @@ DataManager<LoopTimers*>* AllData = NULL;
 // Xeon Phi Max Rate
 //#define CLOCK_RATE_HZ 1333332000
 inline uint64_t read_timestamp_counter(){
-    unsigned low, high;
-    __asm__ volatile ("rdtsc" : "=a" (low), "=d"(high));
-    return ((unsigned long long)low | (((unsigned long long)high) << 32));
+    #if defined(__x86_64__) || defined(__amd64__)
+        unsigned low, high;
+        __asm__ volatile ("rdtsc" : "=a" (low), "=d"(high));
+        return ((unsigned long long)low | (((unsigned long long)high) << 32));
+    #elif defined(__aarch64__)
+        // borrowed from google's microbenchmark cycleclock.h
+        int64_t virtual_timer_value;
+        asm volatile("mrs %0, cntvct_el0" : "=r"(virtual_timer_value));
+        return (uint64_t)virtual_timer_value;
+    #else
+        struct timeval tv;
+        gettimeofday(&tv, nullptr);
+        return ((unsigned long long)(tv.tv_sec) * 1000000 +
+          (unsigned long long)tv.tv_usec);
+    #endif
+    return 0;
 }
 
 /*
@@ -100,14 +113,21 @@ LoopTimers* GenerateLoopTimers(LoopTimers* timers, uint32_t typ, image_key_t iid
     memset(retval->loopTimerLast, 0, sizeof(uint64_t) * retval->loopCount);
     memset(retval->entryCounts, 0, sizeof(uint64_t) * retval->loopCount);
 
-    if (ReadEnvUint32("TIMER_CPU_FREQ", &timerCPUFreq)) {
-        inform << "Got custom TIMER_CPU_FREQ ***(in MHz)** from the user :: " << timerCPUFreq << endl;
-        // convert timerCPUFreq from MHz to Hz
-        timerCPUFreq=timerCPUFreq*1000;
-    } else {
-        timerCPUFreq=CLOCK_RATE_HZ;
-    }
-
+    // see if the FTIMER_CPU_FREQ env var is defined
+    #if defined(__x86_64__) || defined(__amd64__)
+        if (ReadEnvUint32("TIMER_CPU_FREQ", &timerCPUFreq)) {
+            inform << "Got custom TIMER_CPU_FREQ ***(in MHz)** from the user "
+              ":: " << timerCPUFreq << endl;
+            // convert timerCPUFreq from MHz to Hz
+            timerCPUFreq=timerCPUFreq*1000;
+        } else {
+            timerCPUFreq=CLOCK_RATE_HZ;
+        }
+    #elif defined(__aarch64__)
+        timerCPUFreq=100000000;
+    #else
+        timerCPUFreq=1000000;
+    #endif
 
     return retval;
 }

@@ -23,9 +23,9 @@ EPA_TOOLS_PATH = @PEBIL_SUBDIR_EPA_TOOLS_PATH@
 PEBIL_PAPI_BUILD = @PEBIL_PAPI_BUILD@
 PEBIL_PAPI_PATH = @PEBIL_PAPI_PATH@
 
-PEBIL_LIBS = libpebilruntime.so libtimer.so libclassifier.so libpfreq.so libtautrace.so liblooptimer.so libcounter.so libaddressstream.so
+PEBIL_LIBS = libpebilruntime.so libtimer.so libclassifier.so libpfreq.so libtautrace.so libcounter.so libaddressstream.so libpebilslicer.so
 ifeq ($(PEBIL_PAPI_BUILD),yes)
-	PEBIL_LIBS += libpapiinst.so libpapifunc.so
+	PEBIL_LIBS += libpapifunc.so
 endif
 
 LIBDIR      = @INST_LIBS_LIBDIR@
@@ -34,8 +34,8 @@ BINDIR      = @INST_LIBS_BINDIR@
 LIB_TARGETS = $(foreach pebil_lib,$(PEBIL_LIBS),$(LIBDIR)/$(pebil_lib))
 MPICC       = @MPICC@
 MPICXX      = @MPICXX@
-CFLAGS      = @CFLAGS@ @MPI_FLAGS@ @CPUFREQ_FLAGS@ @THROTTLER_FLAGS@ @PEBIL_DEBUG@ -w
-CXXFLAGS    = @CXXFLAGS@ @MPI_CXXFLAGS@ @MPI_FLAGS@ @CPUFREQ_FLAGS@ @THROTTLER_FLAGS@ @PEBIL_DEBUG@ -w
+CFLAGS      = @CFLAGS@ @MPI_FLAGS@ @CPUFREQ_FLAGS@ @THROTTLER_FLAGS@ @PEBIL_DEBUG@ @PEBIL_VERBOSE_SLICER@ @INST_TOOL_FLAGS@ -w
+CXXFLAGS    = @CXXFLAGS@ @MPI_CXXFLAGS@ @MPI_FLAGS@ @CPUFREQ_FLAGS@ @THROTTLER_FLAGS@ @PEBIL_DEBUG@ @PEBIL_VERBOSE_SLICER@ @INST_TOOL_FLAGS@ -w
 
 ALL_TARGETS	=	$(LIB_TARGETS)
 
@@ -61,9 +61,18 @@ ifeq ($(EPA_TOOLS_AVAILABLE),yes)
   ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/SpatialLocalityPerMemOp.o
   EXTRA_FLAGS += -DHAS_EPA_TOOLS
   EXTRA_INC += -I$(EPA_TOOLS_PATH)/instcode
+  # If the Data Structure Module is available
+  ifneq ("$(wildcard $(EPA_TOOLS_PATH)/instcode/libdatastructuremodule.so)", "")
+    ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/DataCentricAddressRange.o
+    ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/DataCentricSpatialLocality.o
+    ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/DataCentricCacheSimulation.o
+    ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/DataCentricReuseDistance.o
+    EXTRA_FLAGS += -DHAS_DATA_STRUCTURE_MODULE
+    ASL_LIBS = -L$(EPA_TOOLS_PATH)/instcode -ldatastructuremodule
+    ASL_LIBS += -lunwind
+    ASL_LIBS += -L$(EPA_TOOLS_PATH)/external/memory-container/src -lMemContainer
+  endif
 endif
-
-EXTRA_LIBS = -ldl -lpthread
 
 # opempi does not automatically link fortran mpi
 ifeq ($(MPICC), mpicc)
@@ -84,21 +93,18 @@ $(LIBDIR)/%.O: %.cpp
 $(LIBDIR)/libpebilruntime.so : $(SHARED_COMMON_OBJS)
 	$(MPICXX) $(SHARED_LIB) -o $@ $^ $(EXTRA_LIBS) $(CXXFLAGS)
 
+$(LIBDIR)/libpebilslicer.so : $(LIBDIR)/EmptySlicer.o
+	$(MPICXX) $(SHARED_LIB) -o $@ $^ $(CXXFLAGS)
+
 $(LIBDIR)/libcounter.so : $(LIBDIR)/CounterFunctions.O $(SHARED_COMMON_OBJS)
 	$(MPICXX) $(SHARED_LIB) -o $@ $^ $(EXTRA_LIBS) $(CXXFLAGS)
 $(LIBDIR)/libcounter.a : $(LIBDIR)/CounterFunctions.o $(COMMON_OBJS)
 	$(AR) $@ $(LIBDIR)/CounterFunctions.o $(COMMON_OBJS)
 
 $(LIBDIR)/libaddressstream.so : $(LIBDIR)/AddressStreamLibrary.O $(ASL_OBJS) $(SHARED_COMMON_OBJS)
-	$(MPICXX) $(SHARED_LIB) -o $@ $^ $(EXTRA_LIBS) $(REUSE_LIBS) $(CXXFLAGS)
-
-$(LIBDIR)/liblooptimer.so : $(LIBDIR)/LoopTimer.O $(SHARED_COMMON_OBJS)
-	$(MPICXX) $(SHARED_LIB) -o $@ $^ $(EXTRA_LIBS) $(CXXFLAGS)
+	$(MPICXX) $(SHARED_LIB) -o $@ $^ $(EXTRA_LIBS) $(ASL_LIBS) $(REUSE_LIBS) $(CXXFLAGS)
 
 $(LIBDIR)/libfrequencyconfig.so : $(LIBDIR)/FrequencyConfig.O
-	$(MPICXX) $(SHARED_LIB) -o $@ $^ $(EXTRA_LIBS) $(CXXFLAGS)
-
-$(LIBDIR)/libpapiinst.so : $(LIBDIR)/PAPIInst.O $(SHARED_COMMON_OBJS)
 	$(MPICXX) $(SHARED_LIB) -o $@ $^ $(EXTRA_LIBS) $(CXXFLAGS)
 
 $(LIBDIR)/libtimer.so : $(LIBDIR)/TimerFunctions.O $(SHARED_COMMON_OBJS)
@@ -106,7 +112,7 @@ $(LIBDIR)/libtimer.so : $(LIBDIR)/TimerFunctions.O $(SHARED_COMMON_OBJS)
 $(LIBDIR)/libtimer.a : $(LIBDIR)/TimerFunctions.o $(COMMON_OBJS) 
 	$(AR) $@ $(LIBDIR)/TimerFunctions.o $(COMMON_OBJS)
 
-$(LIBDIR)/libpapifunc.so : $(LIBDIR)/PAPIFunc.O $(SHARED_COMMON_OBJS)
+$(LIBDIR)/libpapifunc.so : $(LIBDIR)/PAPIFunctions.O $(SHARED_COMMON_OBJS)
 	$(MPICXX) $(SHARED_LIB) -o $@ $^ $(EXTRA_LIBS) $(CXXFLAGS)
 
 $(LIBDIR)/libclassifier.so : $(LIBDIR)/ClassifierFunctions.o $(COMMON_OBJS)
@@ -128,6 +134,6 @@ clean:
 	rm -f $(LIBDIR)/*.o $(LIBDIR)/*.O $(LIBDIR)/*.i $(LIBDIR)/*.s $(LIBDIR)/*.ii $(ALL_TARGETS)
 
 install:
-	echo "Nothing to install in external/epa-inst-libs"
+	echo "Nothing to install in instcode"
 	#cp $(LIB_TARGETS) $(LIBDIR)
 

@@ -36,9 +36,16 @@ uint32_t isMpiValid() { return mpiValid; }
 void setMpiValid(int a) { mpiValid = a; }
 
 inline uint64_t read_timestamp_counter(){
-    unsigned low, high;
-    __asm__ volatile ("rdtsc" : "=a" (low), "=d"(high));
-    return ((unsigned long long)low | (((unsigned long long)high) << 32));
+    #if defined(__x86_64__) || defined(__amd64__)
+        unsigned low, high;
+        __asm__ volatile ("rdtsc" : "=a" (low), "=d"(high));
+        return ((unsigned long long)low | (((unsigned long long)high) << 32));
+    #else
+        fprintf(stderr, "InstrumentationCommon.c has not been ported to other "
+          "architectures yet. Exiting.");
+        exit(1);
+    #endif
+    return 0;
 }
 
 inline double read_process_clock(){
