@@ -27,6 +27,7 @@
 #include <AddressStreamDriver.hpp>
 
 #include <AddressRange.hpp>
+#include <ArielFrontend.hpp>
 #include <CacheSimulation.hpp>
 #include <ReuseDistanceASI.hpp>
 #include <ScatterGatherLength.hpp>
@@ -110,7 +111,8 @@ AddressStreamDriver::AddressStreamDriver() {
 
     // Only run Cache Simulation by default
     runAddressRange = false;
-    runCacheSimulation = true;
+    runArielFrontend = true;
+    runCacheSimulation = false;
     runHardwarePrefetching = false;
     runReuseDistance = false;
     runScatterLength = false;
@@ -1067,6 +1069,7 @@ void AddressStreamDriver::SetUpDataStructureModule() {
 void AddressStreamDriver::SetUpTools() {
     // Check for which tools to use
     uint32_t doAddressRange;
+    uint32_t doArielFrontend;
     uint32_t doCacheSimulation;
     uint32_t doHardwarePrefetching;
     uint32_t doReuseDistance;
@@ -1075,6 +1078,9 @@ void AddressStreamDriver::SetUpTools() {
     uint32_t doSpatialLocalityPerMemOp;
     if (parser->ReadEnvUint32("METASIM_ADDRESS_RANGE", &doAddressRange)){
         runAddressRange = (doAddressRange == 0) ? false : true;
+    }
+    if (parser->ReadEnvUint32("METASIM_ARIEL_FRONTEND", &doArielFrontend)){
+        runArielFrontend = (doArielFrontend == 0) ? false : true;
     }
     if (parser->ReadEnvUint32("METASIM_CACHE_SIMULATION", &doCacheSimulation)){
         runCacheSimulation = (doCacheSimulation == 0) ? false : true;
@@ -1118,6 +1124,10 @@ void AddressStreamDriver::SetUpTools() {
     // First add code-centric tools.
     if (runAddressRange && runCodeCentric) {
         tools->push_back(new AddressRangeTool());
+    }
+
+    if (runArielFrontend && runCodeCentric) {
+        tools->push_back(new ArielFrontendTool());
     }
 
     if (runCacheSimulation && runCodeCentric) {

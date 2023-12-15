@@ -28,6 +28,7 @@ class DynamicInstrumentation;
 class MemoryStreamHandler;
 class SamplingMethod;
 class AddressRangeTool;
+class ArielFrontendTool;
 class CacheSimulationTool;
 class ReuseDistanceTool;
 class ScatterGatherLengthTool;
@@ -57,6 +58,7 @@ class AddressStreamDriver {
   
     // Are we running these tools?
     bool runAddressRange;
+    bool runArielFrontend;
     bool runCacheSimulation;
     bool runHardwarePrefetching;
     bool runReuseDistance;
@@ -138,6 +140,7 @@ class AddressStreamDriver {
     virtual void InitializeStatsWithNewStreamStats(AddressStreamStats* stats);
 
     bool IsAddressRange() { return runAddressRange; }
+    bool IsArielFrontend() { return runArielFrontend; }
     bool IsCacheSimulation() { return runCacheSimulation; }
     bool IsHardwarePrefetching() { return runHardwarePrefetching; }
     bool IsReuseDistance() { return runReuseDistance; }
@@ -181,6 +184,7 @@ class AddressStreamDriver {
     void AddTool(AddressStreamTool* t) { tools->push_back(t); }
     AddressStreamTool* GetTool(uint32_t index);
     void SetAddressRange(bool b) { runAddressRange = b; }
+    void SetArielFrontend(bool b) { runArielFrontend = b; }
     void SetCacheSimulation(bool b) { runCacheSimulation = b; }
     void SetHardwarePrefetching(bool b) { runHardwarePrefetching = b; }
     void SetReuseDistance(bool b) { runReuseDistance = b; }
