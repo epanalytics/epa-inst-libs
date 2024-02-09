@@ -7,7 +7,7 @@
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * (at your option) any later version
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -29,6 +29,10 @@
 #include <cstring>
 #include <cassert>
 
+#include <sst/core/interprocess/shmchild.h>
+#include "ariel_shmem.h"
+
+using namespace SST::ArielComponent;
 using namespace std;
 
 void ArielFrontendTool::AddNewHandlers(AddressStreamStats* stats) {
@@ -43,7 +47,13 @@ void ArielFrontendTool::AddNewStreamStats(AddressStreamStats* stats) {
 
 uint32_t ArielFrontendTool::CreateHandlers(uint32_t index, StringParser* parser) {
     indexInStats = index;
-    handlers.push_back(new ArielFrontendHandler());
+    char* e = parser->GetEnv("METASIM_SST_SHMEM");
+    if (e == NULL) {
+        ErrorExit("Please set METASIM_SST_SHMEM", MetasimError_Env);
+    }
+
+    ShmemName = (string)e;
+    handlers.push_back(new ArielFrontendHandler(ShmemName));
     return handlers.size();
 }
 
@@ -52,258 +62,41 @@ void ArielFrontendTool::FinalizeTool(DataManager<AddressStreamStats*>* AllData,
     
     AddressStreamStats* stats = AllData->GetData(AllData->GetFirstImage(),
       pthread_self());
-/*
-    // Create the Address Range report
-    ofstream RangeFile;
-    string oFile;
-    const char* fileName;
-
-    RangeFileName(stats, oFile);
-    fileName=oFile.c_str();
-    inform << "Printing address range results to " << fileName << ENDL;
-    TryOpen(RangeFile,fileName);
-
-    uint64_t sampledCount = 0;
-    uint64_t totalMemop = 0;
-    // Calculate the number of access counts
-    for (set<image_key_t>::iterator iit = AllData->allimages.begin();
-      iit != AllData->allimages.end(); iit++){
-
-        for(DataManager<AddressStreamStats*>::iterator it =
-          AllData->begin(*iit); it != AllData->end(*iit); ++it) {
-            thread_key_t thread = it->first;
-            AddressStreamStats* s = it->second;
-
-            ArielStats* r = (ArielStats*)s->Stats[indexInStats];
-            assert(r);
-            for (uint32_t i = 0; i < r->GetCapacity(); i++){
-                sampledCount += r->GetAccessCount(i);
-            }
-
-            for (uint32_t i = 0; i < s->BlockCount; i++){
-                uint32_t idx;
-                // Don't need to do this loop if this block doesn't have
-                // any memops
-                if(s->MemopsPerBlock[i] == 0) {
-                    continue;
-                }
-                if (s->Types[i] == CounterType_basicblock){
-                    idx = i;
-                } else if (s->Types[i] == CounterType_instruction){
-                    idx = s->Counters[i];
-                }
-                totalMemop += (s->Counters[idx] * s->MemopsPerBlock[i]);
-            }
-
-            inform << "Total memop: " << dec << totalMemop << TAB <<
-              " sampledCount " << sampledCount << ENDL;
-        }
-    }
-
-    // Print application and address stream information
-    RangeFile
-      << "# appname       = " << stats->Application << ENDL
-      << "# extension     = " << stats->Extension << ENDL
-      << "# rank          = " << dec << GetTaskId() << ENDL
-      << "# ntasks        = " << dec << GetNTasks() << ENDL
-      << "# buffer        = " << BUFFER_CAPACITY(stats) << ENDL
-      << "# total         = " << dec << totalMemop << ENDL
-      << "# processed     = " << dec << sampledCount << " ("
-      << ((double)sampledCount / (double)totalMemop * 100.0)
-      << "% of total)" << ENDL
-      << "# samplemax     = " << Sampler->GetAccessLimit() << ENDL
-      << "# sampleon      = " << Sampler->GetSampleOn() << ENDL
-      << "# sampleoff     = " << Sampler->GetSampleOff() << ENDL
-      << "# perinsn       = " << (stats->PerInstruction? "yes" : "no")
-      << ENDL
-      << "# lpi           = " << (stats->LoopInclusion? "yes" : "no")
-      << ENDL
-      << "# countimage    = " << dec << AllData->CountImages() << ENDL
-      << "# countthread   = " << dec << AllData->CountThreads() << ENDL
-      << "# masterthread  = " << hex << AllData->GetThreadSequence(
-      pthread_self()) << ENDL
-      << ENDL;
-
-    // Print information for each image
-    RangeFile << "# IMG" << TAB << "ImageHash" << TAB << "ImageSequence"
-      << TAB << "ImageType" << TAB << "Name" << ENDL;
-
-    for (set<image_key_t>::iterator iit = AllData->allimages.begin();
-      iit != AllData->allimages.end(); iit++){
-        AddressStreamStats* s = (AddressStreamStats*)AllData->GetData(
-          (*iit), pthread_self());
-        RangeFile << "IMG" << TAB << hex << (*iit) << TAB << dec
-          << AllData->GetImageSequence((*iit)) << TAB
-          << (s->Master ? "Executable" : "SharedLib") << TAB
-          << s->Application << ENDL;
-    }
-    RangeFile << ENDL;
-
-
-    // Print the information for each block
-    RangeFile << "# " << "BLK" << TAB << "Sequence" << TAB << "Hashcode"
-      << TAB << "ImageSequence" << TAB << "ThreadId" << TAB
-      << "BlockCounter" << TAB << "InstructionSimulated" << TAB
-      << "MinAddress" << TAB << "MaxAddress" << TAB << "AddrRange " << ENDL;
-    for (set<image_key_t>::iterator iit = AllData->allimages.begin();
-      iit != AllData->allimages.end(); iit++){
-        for(DataManager<AddressStreamStats*>::iterator it =
-          AllData->begin(*iit); it != AllData->end(*iit); ++it){
-
-            AddressStreamStats* st = it->second;
-            assert(st);
-            ArielStats* aggRange;
-
-            // Stats are collected by memid. We need to present them by
-            // block. Even if perinsn, just create new ArielStats data
-            // structure and compile per-memid data into it
-            aggRange = new ArielStats(st->AllocCount);
-
-            for (uint32_t memid = 0; memid < st->AllocCount; memid++){
-                uint32_t bbid;
-                ArielStats* r = (ArielStats*)st->Stats[indexInStats];
-                if (st->PerInstruction){
-                    bbid = memid;
-                } else {
-                    bbid = st->BlockIds[memid];
-                }
-
-                aggRange->Update(bbid, r->GetMinimum(memid), 0);
-                aggRange->Update(bbid, r->GetMaximum(memid),
-                  r->GetAccessCount(memid));
-            }
-            uint32_t MaxCapacity;
-            MaxCapacity = aggRange->GetCapacity();
-
-            for (uint32_t bbid = 0; bbid < MaxCapacity; bbid++){
-                // dont print blocks which weren't touched
-                if (aggRange->GetAccessCount(bbid)==0){
-                    continue;
-                }
-                // this isn't necessarily true since this tool can suspend
-                // threads at any point. potentially shutting off
-                // instrumention in a block while a thread is midway through
-                // Sanity check data
-                // This assertion becomes FALSE when there are
-                // multiple addresses processed per address
-                // (e.g. with scatter/gather)
-                if (AllData->CountThreads() == 1 &&
-                  !st->HasNonDeterministicMemop[bbid]){
-                    if (aggRange->GetAccessCount(bbid) %
-                      st->MemopsPerBlock[bbid] != 0){
-                        inform << "bbid " << dec << bbid << " image " <<
-                          hex << (*iit) << " accesses " << dec <<
-                          aggRange->GetAccessCount(bbid) << " memops " <<
-                          st->MemopsPerBlock[bbid] << ENDL;
-                    }
-                    assert(aggRange->GetAccessCount(bbid) %
-                      st->MemopsPerBlock[bbid] == 0);
-                }
-
-                uint32_t idx;
-                if (st->Types[bbid] == CounterType_basicblock){
-                    idx = bbid;
-                } else if (st->Types[bbid] == CounterType_instruction){
-                    idx = st->Counters[bbid];
-                }
-
-                RangeFile  << "BLK" << TAB << dec << bbid
-                  << TAB << hex << st->Hashes[bbid]
-                  << TAB << dec << AllData->GetImageSequence((*iit))
-                  << TAB << dec << AllData->GetThreadSequence(st->threadid)
-                  << TAB << dec << st->Counters[idx]
-                  << TAB << dec << aggRange->GetAccessCount(bbid)
-                  << TAB << hex << aggRange->GetMinimum(bbid)
-                  << TAB << hex << aggRange->GetMaximum(bbid)
-                  << TAB << hex << (aggRange->GetMaximum(bbid) -
-                    aggRange->GetMinimum(bbid))<<ENDL;
-            } // For each block
-            delete aggRange;
-        } // For each data manager
-    } // For each image
-
-    // Close the file
-    RangeFile.close();
-*/
 
 }
 
-//void ArielFrontendTool::RangeFileName(AddressStreamStats* stats, string& oFile){
-//    oFile.clear();
-//    oFile.append(stats->Application);
-//    oFile.append(".r");
-//    AppendRankString(oFile);
-//    oFile.append(".t");
-//    AppendTasksString(oFile);
-//    oFile.append(".");
-//    oFile.append("addrange");
-//}
-
 ArielStats::ArielStats(uint32_t capacity){
-//    Capacity = capacity;
-//    Counts = new uint64_t[Capacity];
-//    bzero(Counts, sizeof(uint64_t) * Capacity);
-//    Ranges = new ArielFrontend*[Capacity];
-//    for (uint32_t i = 0; i < Capacity; i++){
-//        Ranges[i] = new ArielFrontend();
-//        Ranges[i]->Minimum = MAX_64BIT_VALUE;
-//        Ranges[i]->Maximum = 0;
-//    }
 }
 
 ArielStats::~ArielStats(){
-//    if (Ranges){
-//        delete[] Ranges;
-//    }
-//    if (Counts){
-//        delete[] Counts;
-//    }
 }
-
-//bool ArielStats::HasMemId(uint32_t memid){
-//    if (memid >= Capacity) {
-//        fprintf(stderr, "memid not found, if this issues is causing an error"
-//          " try setting METASIM_DS_SIZE bigger than %d\n", Capacity);
-//    }
-//    return (memid < Capacity);
-//}
-//
-//uint64_t ArielStats::GetMinimum(uint32_t memid){
-//    assert(HasMemId(memid));
-//    return Ranges[memid]->Minimum;
-//}
-//
-//uint64_t ArielStats::GetMaximum(uint32_t memid){
-//    assert(HasMemId(memid));
-//    return Ranges[memid]->Maximum;
-//}
 
 void ArielStats::Update(uint32_t memid, uint64_t addr){
     Update(memid, addr, 1);
 }
 
 void ArielStats::Update(uint32_t memid, uint64_t addr, uint32_t count){
-//    assert(HasMemId(memid) && "Memory ID is out of bounds");
-//    ArielFrontend* r = Ranges[memid];
-//    if (addr < r->Minimum){
-//        r->Minimum = addr;
-//    }
-//    if (addr > r->Maximum){
-//        r->Maximum = addr;
-//    }
-//    Counts[memid] += count;
 }
 
 bool ArielStats::Verify(){
     return true;
 }
 
-ArielFrontendHandler::ArielFrontendHandler(){
-    tunnelmgr = new SST::Core::Interprocess::MMAPChild_Pin3<ArielTunnel>(
-      SSTNamedPipe.Value());
+//SST::Core::Interprocess::SHMChild<ArielTunnel> * tunnelmgr;
+ArielFrontendHandler::ArielFrontendHandler(std::string n) : ShmemName(n) {
+    tunnelmgr = new SST::Core::Interprocess::SHMChild<ArielTunnel>(ShmemName);
     tunnel = tunnelmgr->getTunnel();
 }
-ArielFrontendHandler::~ArielFrontendHandler(){
+ArielFrontendHandler::~ArielFrontendHandler() {
+    if (tunnel != NULL) {
+        ArielCommand ac;
+        ac.command = ARIEL_PERFORM_EXIT;
+        ac.instPtr = (uint64_t) 0;
+        tunnel->writeMessage(0, ac);
+        
+        delete tunnel;
+    }
+    tunnel = NULL;
 }
 
 void ArielFrontendHandler::Print(ofstream& f){
@@ -312,15 +105,34 @@ void ArielFrontendHandler::Print(ofstream& f){
 
 uint32_t ArielFrontendHandler::Process(void* stats, uint64_t memSeq, 
   bool ldstFlag, uint64_t* addresses, uint64_t length, bool memvecFlag) {
+    ArielCommand ac;
 
-//    for(int i = 0; i < length; i++) {
-//        uint64_t addr = addresses[i];
-//        if (addr != 0) {
-//            uint32_t memId = (uint32_t)memSeq;
-//            ArielStats* rs = (ArielStats*)stats;
-//            rs->Update(memSeq, addr);
-//        }
-//    }
-//    return 0;
+    for(int i = 0; i < length; i++) {
+        uint64_t addr = addresses[i];
+        if (addr != 0) {
+            ac.command = ARIEL_START_INSTRUCTION;
+            ac.instPtr = memSeq;
+            tunnel->writeMessage(0, ac);  // SST-TODO: Thread id
+
+            // if load
+            if (ldstFlag)
+                ac.command = ARIEL_PERFORM_READ;
+            else
+                ac.command = ARIEL_PERFORM_WRITE;
+
+            ac.instPtr = memSeq;
+            ac.inst.addr = addr;
+            ac.inst.size = 64;   // SST-TODO: pass info + bits or bytes?
+            ac.inst.instClass = 0;    // SST-TODO: implement
+            ac.inst.simdElemCount = 1; // SST-TODO: implement
+            tunnel->writeMessage(0, ac);  // SST-TODO: Thread id
+
+            ac.command = ARIEL_END_INSTRUCTION;
+            ac.instPtr = memSeq;
+            tunnel->writeMessage(0, ac);    // SST-TODO: Thread id
+        }
+    }
+    return 0;
+
 }
                 

@@ -22,6 +22,7 @@ EPA_TOOLS_AVAILABLE = @PEBIL_EPA_TOOLS_AVAILABLE@
 EPA_TOOLS_PATH = @PEBIL_SUBDIR_EPA_TOOLS_PATH@
 PEBIL_PAPI_BUILD = @PEBIL_PAPI_BUILD@
 PEBIL_PAPI_PATH = @PEBIL_PAPI_PATH@
+SST_AVAILABLE = @SST_AVAILABLE@
 
 PEBIL_LIBS = libpebilruntime.so libtimer.so libclassifier.so libpfreq.so libtautrace.so libcounter.so libaddressstream.so libpebilslicer.so
 ifeq ($(PEBIL_PAPI_BUILD),yes)
@@ -55,6 +56,12 @@ COMMON_OBJS = $(LIBDIR)/InstrumentationCommon.o
 SHARED_COMMON_OBJS = $(LIBDIR)/InstrumentationCommon.O $(LIBDIR)/ThreadedCommon.O $(LIBDIR)/DynamicInstrumentation.O
 
 ASL_OBJS = $(LIBDIR)/AddressStreamBase.O $(LIBDIR)/AddressRange.O $(LIBDIR)/CacheSimulation.O $(LIBDIR)/ReuseDistanceASI.O $(LIBDIR)/ScatterGatherLength.O $(LIBDIR)/SpatialLocality.O $(LIBDIR)/AddressStreamDriver.O
+
+ifeq ($(SST_AVAILABLE),yes)
+	EXTRA_INC += @SST_INCLUDES@
+  ASL_OBJS += $(LIBDIR)/ArielFrontend.O
+  EXTRA_FLAGS += -DHAS_ARIEL_FRONTEND
+endif
 
 ifeq ($(EPA_TOOLS_AVAILABLE),yes)
   ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/PrefetchSimulation.o

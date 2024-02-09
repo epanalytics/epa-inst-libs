@@ -21,10 +21,27 @@
 #ifndef _ArielFrontend_hpp_
 #define _ArielFrontend_hpp_
 
+#include <sst/core/sst_config.h>
+
+
 #include <AddressStreamBase.hpp>
 #include <string>
 
+namespace SST {
+  namespace ArielComponent {
+    class ArielTunnel;
+  }
+
+  namespace Core {
+    namespace Interprocess {
+      template <typename TunnelType> class SHMChild;
+    }
+  }
+}
+
 class ArielFrontendTool : public AddressStreamTool {
+  protected:
+    std::string ShmemName = "";
   public:
     ArielFrontendTool() : AddressStreamTool() {}
     virtual void AddNewHandlers(AddressStreamStats* stats);
@@ -32,27 +49,17 @@ class ArielFrontendTool : public AddressStreamTool {
     virtual uint32_t CreateHandlers(uint32_t index, StringParser* parser);
     virtual void FinalizeTool(DataManager<AddressStreamStats*>* AllData,
       SamplingMethod* Sampler);
-//    virtual void RangeFileName(AddressStreamStats* stats, std::string& oFile);
 };
 
 class ArielStats : public StreamStats {
 private:
-//    static const uint64_t MAX_64BIT_VALUE = 0xffffffffffffffff;
-//
-//    uint32_t Capacity;
-//    uint64_t* Counts;
-//    ArielFrontend** Ranges;
 
 public:
 
     ArielStats(uint32_t capacity);
     virtual ~ArielStats();
 
-//    bool HasMemId(uint32_t memid);
     uint64_t GetAccessCount(uint32_t memid) { return 0; }
-//    uint32_t GetCapacity() { return Capacity; }
-//    uint64_t GetMinimum(uint32_t memid);
-//    uint64_t GetMaximum(uint32_t memid);
 
     virtual void Update(uint32_t memid, uint64_t addr);
     virtual void Update(uint32_t memid, uint64_t addr, uint32_t count);
@@ -62,10 +69,12 @@ public:
 
 class ArielFrontendHandler : public MemoryStreamHandler {
 private:
-    SST::Core::Interprocess::MMAPChild_Pin3<ArielTunnel>* tunnelmgr;
-    ArielTunnel* tunnel;
+    SST::Core::Interprocess::SHMChild<SST::ArielComponent::ArielTunnel>*
+      tunnelmgr;
+    SST::ArielComponent::ArielTunnel* tunnel;
+    std::string ShmemName;
 public:
-    ArielFrontendHandler();
+    ArielFrontendHandler(std::string n);
     ~ArielFrontendHandler();
 
     void Print(std::ofstream& f);

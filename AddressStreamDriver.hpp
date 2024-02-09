@@ -28,7 +28,6 @@ class DynamicInstrumentation;
 class MemoryStreamHandler;
 class SamplingMethod;
 class AddressRangeTool;
-class ArielFrontendTool;
 class CacheSimulationTool;
 class ReuseDistanceTool;
 class ScatterGatherLengthTool;
@@ -99,6 +98,7 @@ class AddressStreamDriver {
     AddressStreamDriver();
     virtual ~AddressStreamDriver();
 
+    bool BuiltWithArielFrontend();
     bool BuiltWithDataStructureModule();
     bool BuiltWithEPATools();
 

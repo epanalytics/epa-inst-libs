@@ -27,11 +27,14 @@
 #include <AddressStreamDriver.hpp>
 
 #include <AddressRange.hpp>
-#include <ArielFrontend.hpp>
 #include <CacheSimulation.hpp>
 #include <ReuseDistanceASI.hpp>
 #include <ScatterGatherLength.hpp>
 #include <SpatialLocality.hpp>
+
+#ifdef HAS_ARIEL_FRONTEND
+#include <ArielFrontend.hpp>
+#endif
 
 #ifdef HAS_EPA_TOOLS
 #include <DataCentricAddressRange.hpp>
@@ -65,6 +68,12 @@
 using namespace std;
 
 // Define directives to keep #ifdefs out of code
+#ifdef HAS_ARIEL_FRONTEND
+  #define GENERATE_ARIEL_TOOL new ArielFrontendTool()
+#else
+  #define GENERATE_ARIEL_TOOL 0
+#endif
+
 #ifdef HAS_EPA_TOOLS
   #define GENERATE_PREFETCH_TOOL new PrefetchSimulationTool()
   #define GENERATE_SPATIAL_MEMOP_TOOL new SpatialLocalityPerMemOpTool()
@@ -111,8 +120,8 @@ AddressStreamDriver::AddressStreamDriver() {
 
     // Only run Cache Simulation by default
     runAddressRange = false;
-    runArielFrontend = true;
-    runCacheSimulation = false;
+    runArielFrontend = false;
+    runCacheSimulation = true;
     runHardwarePrefetching = false;
     runReuseDistance = false;
     runScatterLength = false;
@@ -157,6 +166,14 @@ AddressStreamDriver::~AddressStreamDriver() {
     delete fastData;
 
     DELETE_MODULE(dataStructureModule);
+}
+
+bool AddressStreamDriver::BuiltWithArielFrontend() {
+    #ifdef HAS_ARIEL_FRONTEND
+    return true;
+    #else
+    return false;
+    #endif
 }
 
 bool AddressStreamDriver::BuiltWithDataStructureModule() {
@@ -1127,7 +1144,13 @@ void AddressStreamDriver::SetUpTools() {
     }
 
     if (runArielFrontend && runCodeCentric) {
-        tools->push_back(new ArielFrontendTool());
+        if (BuiltWithArielFrontend()) {
+            tools->push_back(GENERATE_ARIEL_TOOL);
+        } else {
+            DISPLAY_ERROR << "No ariel frontend library included. "
+              << "Unset Ariel frontend library tool. Exitting." << ENDL;
+            exit(0);
+        }
     }
 
     if (runCacheSimulation && runCodeCentric) {
