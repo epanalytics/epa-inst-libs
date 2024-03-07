@@ -42,7 +42,10 @@ void ArielFrontendTool::AddNewHandlers(AddressStreamStats* stats) {
 }
 
 void ArielFrontendTool::AddNewStreamStats(AddressStreamStats* stats) {
-    stats->Stats[indexInStats] = new ArielStats(stats->AllocCount);
+    stats->Stats[indexInStats] = new ArielStats(stats->ThreadSeq);
+    ((ArielStats*)(stats->Stats[indexInStats]))->SetIsDP(stats->IsDP);
+    ((ArielStats*)(stats->Stats[indexInStats]))->SetIsFP(stats->IsFP);
+    ((ArielStats*)(stats->Stats[indexInStats]))->SetSize(stats->SizeInBytes);
 }
 
 uint32_t ArielFrontendTool::CreateHandlers(uint32_t index, StringParser* parser) {
@@ -65,17 +68,10 @@ void ArielFrontendTool::FinalizeTool(DataManager<AddressStreamStats*>* AllData,
 
 }
 
-ArielStats::ArielStats(uint32_t capacity){
+ArielStats::ArielStats(uint32_t threadSeq) : threadId(threadSeq) {
 }
 
 ArielStats::~ArielStats(){
-}
-
-void ArielStats::Update(uint32_t memid, uint64_t addr){
-    Update(memid, addr, 1);
-}
-
-void ArielStats::Update(uint32_t memid, uint64_t addr, uint32_t count){
 }
 
 bool ArielStats::Verify(){
@@ -105,14 +101,28 @@ void ArielFrontendHandler::Print(ofstream& f){
 
 uint32_t ArielFrontendHandler::Process(void* stats, uint64_t memSeq, 
   bool ldstFlag, uint64_t* addresses, uint64_t length, bool memvecFlag) {
+    ArielStats* s = (ArielStats*)stats;
     ArielCommand ac;
+
+    if (length <= 0)
+        return 0;
+
+    // Send Start instruction
+    ac.command = ARIEL_START_INSTRUCTION;
+    ac.instPtr = memSeq;
+    ac.inst.instClass = ARIEL_INST_UNKNOWN;
+    if (s->IsFP(memSeq)) {
+        if (s->IsDP(memSeq))
+            ac.inst.instClass = ARIEL_INST_DP_FP;
+        else
+            ac.inst.instClass = ARIEL_INST_SP_FP;
+    }
+    ac.inst.simdElemCount = length;
+    tunnel->writeMessage(s->GetThread(), ac);
 
     for(int i = 0; i < length; i++) {
         uint64_t addr = addresses[i];
         if (addr != 0) {
-            ac.command = ARIEL_START_INSTRUCTION;
-            ac.instPtr = memSeq;
-            tunnel->writeMessage(0, ac);  // SST-TODO: Thread id
 
             // if load
             if (ldstFlag)
@@ -122,16 +132,21 @@ uint32_t ArielFrontendHandler::Process(void* stats, uint64_t memSeq,
 
             ac.instPtr = memSeq;
             ac.inst.addr = addr;
-            ac.inst.size = 64;   // SST-TODO: pass info + bits or bytes?
-            ac.inst.instClass = 0;    // SST-TODO: implement
-            ac.inst.simdElemCount = 1; // SST-TODO: implement
-            tunnel->writeMessage(0, ac);  // SST-TODO: Thread id
+            ac.inst.size = s->GetSize(memSeq);
 
-            ac.command = ARIEL_END_INSTRUCTION;
-            ac.instPtr = memSeq;
-            tunnel->writeMessage(0, ac);    // SST-TODO: Thread id
+            //if (ldstFlag)
+            //fprintf(stderr, "ACC: ARIEL_PERFORM_READ: %d, %#lx\n", ac.instPtr,
+            //  ac.inst.addr);
+            //else
+            //fprintf(stderr, "ACC: ARIEL_PERFORM_WRITE: %d, %#lx\n", ac.instPtr,
+            //  ac.inst.addr);
+            tunnel->writeMessage(s->GetThread(), ac);
         }
     }
+
+    ac.command = ARIEL_END_INSTRUCTION;
+    ac.instPtr = memSeq;
+    tunnel->writeMessage(s->GetThread(), ac);
     return 0;
 
 }

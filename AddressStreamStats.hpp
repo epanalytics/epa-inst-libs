@@ -145,9 +145,13 @@ typedef struct AddressStreamStats_s {
     uint32_t MemopCount;
     char* Application;
     char* Extension;
+    uint32_t ThreadSeq;
 
     // per-memop data
     uint64_t* BlockIds;   // Indices into per-block data, like counter
+    bool* IsDP;           // Is double-precision? False - single-precision
+    bool* IsFP;           // Is floating-point ins (for Ariel)
+    uint32_t* SizeInBytes;// Size of load or store in bytes
 
     // per-block data
     CounterTypes* Types; // If Counter is a count or index to a count

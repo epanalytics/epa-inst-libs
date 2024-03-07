@@ -274,6 +274,7 @@ AddressStreamStats* GenerateStreamStats(AddressStreamStats* stats, uint32_t typ,
     stats->threadid = tid;
     stats->imageid = iid;
     stats->FirstImage = (firstimage == iid);
+    stats->ThreadSeq = allData->GetThreadSequence(tid, false);
 
     if(stats->MemopCount > stats->BlockCount) {
         stats->AllocCount = stats->MemopCount;

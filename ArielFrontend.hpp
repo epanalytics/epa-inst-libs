@@ -53,16 +53,26 @@ class ArielFrontendTool : public AddressStreamTool {
 
 class ArielStats : public StreamStats {
 private:
+    uint64_t threadId;
+    bool* isDP;
+    bool* isFP;
+    uint32_t* sizeInBytes;
 
 public:
 
-    ArielStats(uint32_t capacity);
+    ArielStats(uint32_t threadSeq);
     virtual ~ArielStats();
 
     uint64_t GetAccessCount(uint32_t memid) { return 0; }
+    uint32_t GetSize(uint32_t memid) { return sizeInBytes[memid]; }
+    uint32_t GetThread() { return threadId; }
 
-    virtual void Update(uint32_t memid, uint64_t addr);
-    virtual void Update(uint32_t memid, uint64_t addr, uint32_t count);
+    bool IsDP(uint32_t memseq) { return isDP[memseq]; }
+    bool IsFP(uint32_t memseq) { return isFP[memseq]; }
+
+    void SetIsDP(bool* newIsDP) { isDP = newIsDP; }
+    void SetIsFP(bool* newIsFP) { isFP = newIsFP; }
+    void SetSize(uint32_t* newSize) { sizeInBytes = newSize; }
 
     bool Verify();
 };
