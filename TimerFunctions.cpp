@@ -359,6 +359,19 @@ extern "C"
     void* tool_pre_mpi_init() {
         return NULL;
     }
+    void* tool_pre_shmem_fini(){
+        return NULL;
+    }
+    
+    void* tool_pre_shmem_init(){
+        return NULL;
+    }
+    void* tool_shmem_init(){
+        return NULL;
+    }
+    void* tool_shmem_finalize(){
+        return NULL;
+    }
 
     // Entry function for threads
     void* tool_thread_init(thread_key_t tid) {

@@ -348,6 +348,20 @@ void pfreq_throttle_fini(){
     }
 }
 
+void* tool_pre_shmem_fini(){
+    return NULL;
+}
+
+void* tool_pre_shmem_init(){
+    return NULL;
+}
+void* tool_shmem_init(){
+    return NULL;
+}
+void* tool_shmem_finalize(){
+    return NULL;
+}
+
 // called just after mpi_init
 void* tool_mpi_init(){
     nprocessors = sysconf(_SC_NPROCESSORS_ONLN);
