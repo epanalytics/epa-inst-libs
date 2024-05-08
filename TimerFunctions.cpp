@@ -448,7 +448,7 @@ extern "C"
             if (GET_TYPE(k) == PointType_functionEntry || 
               GET_TYPE(k) == PointType_functionExit) {
 
-                assert(EntryExitKeys.find(k) == EntryExitKeys.find(k));
+                assert(EntryExitKeys.find(k) == EntryExitKeys.end());
                 EntryExitKeys.insert(k);
             }
         }
