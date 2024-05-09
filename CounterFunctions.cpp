@@ -278,7 +278,6 @@ extern "C"
             // turn them on/off
             std::set<uint64_t> keys;
             DynamicPoints->GetAllDynamicKeys(keys);
-            assert(BlockCountKeys.empty());
             for (auto it = keys.begin(); it != keys.end(); it++) {
                 uint64_t k = (*it);
                 if (GET_TYPE(k) == PointType_blockcount) {

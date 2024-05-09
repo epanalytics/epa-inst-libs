@@ -443,11 +443,12 @@ extern "C"
         // user can turn them on/off
         std::set<uint64_t> keys;
         DynamicPoints->GetAllDynamicKeys(keys);
-        assert(EntryExitKeys.empty());
         for (auto it = keys.begin(); it != keys.end(); it++) {
             uint64_t k = (*it);
             if (GET_TYPE(k) == PointType_functionEntry || 
               GET_TYPE(k) == PointType_functionExit) {
+
+                assert(EntryExitKeys.find(k) == EntryExitKeys.end());
                 EntryExitKeys.insert(k);
             }
         }
@@ -467,17 +468,6 @@ extern "C"
 
         image_key_t iid = *key;
 
-        // Only print one file with data from all images
-        static bool finalized = false;
-        if (finalized)
-            return NULL;
-
-        finalized = true;
-
-        if (DynamicPoints != NULL) {
-            delete DynamicPoints;
-        }
-
         if (AllData == NULL){
             ErrorExit("data manager does not exist. no images were intialized",
               MetasimError_NoImage);
@@ -492,10 +482,20 @@ extern "C"
         }
 
         if (!timers->master){
-            printf("Image is not master, skipping\n");
+            return NULL;
+        } 
+
+        // Only print one file with data from all images
+        static bool finalized = false;
+        if (finalized) {
             return NULL;
         }
 
+        finalized = true;
+
+        if (DynamicPoints != NULL) {
+            delete DynamicPoints;
+        }
 
         uint64_t appTimeEnd = read_timestamp_counter();
         struct timeval tvEnd;
