@@ -44,6 +44,7 @@ using namespace std;
 static DataManager<CounterArray*>* AllData = NULL;
 static DynamicInstrumentation* DynamicPoints = NULL;
 static std::set<uint64_t> BlockCountKeys;
+static bool UsedSlicer = false;
 
 void print_loop_array(FILE* stream, CounterArray* ctrs){
     if (ctrs == NULL){
@@ -172,6 +173,7 @@ extern "C"
     void pebil_slicer_verbose_start(const char*);
     void pebil_slicer_verbose_pause(const char*);
     void epa_pebil_start() {
+        UsedSlicer = true;
 #ifdef VERBOSE_SLICER
         pebil_slicer_verbose_start("JBB");
 #endif
@@ -182,6 +184,7 @@ extern "C"
     void epa_pebil_start_() { epa_pebil_start(); return; }
 
     void epa_pebil_pause() {
+        UsedSlicer = true;
 #ifdef VERBOSE_SLICER
         pebil_slicer_verbose_pause("JBB");
 #endif
@@ -398,7 +401,9 @@ extern "C"
             BlockFile << "# blockcount      = " << dec << blockCount << ENDL;
         }
         BlockFile
-            << "# loopcount       = " << dec << loopCount << ENDL
+            << "# loopcount       = " << dec << loopCount << ENDL;
+        BlockFile
+            << "# slicer          = " << dec << UsedSlicer << ENDL
             << ENDL;
             
         // print image summaries

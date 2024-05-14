@@ -453,6 +453,7 @@ void CacheSimulationTool::PrintApplicationHeader(ofstream& file,
       << "# masterthread  = " << hex << AllData->GetThreadSequence(
       pthread_self()) << ENDL 
       << "# LoadStoreLogging = " << dec << true << ENDL
+      << "# slicer        = " << dec << *(stats->UsedSlicerPtr) << ENDL
       << ENDL;
 
     // Print information for each image
