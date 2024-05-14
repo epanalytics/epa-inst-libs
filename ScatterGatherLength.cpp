@@ -134,6 +134,7 @@ void ScatterGatherLengthTool::FinalizeTool(DataManager<AddressStreamStats*>*
       << "# countthread   = " << dec << AllData->CountThreads() << ENDL
       << "# masterthread  = " << hex << AllData->GetThreadSequence(
       pthread_self()) << ENDL
+      << "# slicer        = " << dec << *(stats->UsedSlicerPtr) << ENDL
       << ENDL;
     
     // Print information for each image 
