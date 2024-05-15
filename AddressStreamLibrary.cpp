@@ -38,13 +38,11 @@ using namespace std;
 
 // global data
 static AddressStreamDriver* Driver = NULL;
-static bool UsedSlicer = false;
 
 extern "C" {
     void pebil_slicer_verbose_start(const char*);
     void pebil_slicer_verbose_pause(const char*);
     void epa_pebil_start() {
-        UsedSlicer = true;
 #ifdef VERBOSE_SLICER
         pebil_slicer_verbose_start("ADDSTRINST");
 #endif
@@ -55,7 +53,6 @@ extern "C" {
     void epa_pebil_start_() { epa_pebil_start(); return; }
 
     void epa_pebil_pause() {
-        UsedSlicer = true;
 #ifdef VERBOSE_SLICER
         pebil_slicer_verbose_pause("ADDSTRINST");
 #endif
@@ -307,7 +304,6 @@ AddressStreamStats* GenerateStreamStats(AddressStreamStats* stats, uint32_t typ,
     Driver->InitializeStatsWithNewStreamStats(stats);
 
     // Initialize with other run data
-    stats->UsedSlicerPtr = &UsedSlicer;
     #ifdef EPAX_INST_TOOL
     stats->maxNumAddresses = 256;
     #else
