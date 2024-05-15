@@ -170,7 +170,6 @@ typedef struct AddressStreamStats_s {
     uint64_t* GroupCounters;
 
     // run data
-    bool* UsedSlicerPtr;    // Pointer to global in Library
     uint64_t maxNumAddresses;
     uint64_t* addressesForProcessing;
 
