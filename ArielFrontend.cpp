@@ -80,8 +80,6 @@ bool ArielStats::Verify(){
 
 //SST::Core::Interprocess::SHMChild<ArielTunnel> * tunnelmgr;
 ArielFrontendHandler::ArielFrontendHandler(std::string n) : ShmemName(n) {
-    tunnelmgr = new SST::Core::Interprocess::SHMChild<ArielTunnel>(ShmemName);
-    tunnel = tunnelmgr->getTunnel();
 }
 ArielFrontendHandler::~ArielFrontendHandler() {
     if (tunnel != NULL) {
@@ -95,6 +93,15 @@ ArielFrontendHandler::~ArielFrontendHandler() {
     tunnel = NULL;
 }
 
+void ArielFrontendHandler::InitializeTunnel() {
+    if (tunnel != NULL)
+        return;
+
+    tunnelmgr = new SST::Core::Interprocess::SHMChild<ArielTunnel>(ShmemName);
+    tunnel = tunnelmgr->getTunnel();
+
+}
+
 void ArielFrontendHandler::Print(ofstream& f){
     f << "ArielFrontendHandler" << ENDL;
 }
@@ -106,6 +113,11 @@ uint32_t ArielFrontendHandler::Process(void* stats, uint64_t memSeq,
 
     if (length <= 0)
         return 0;
+
+    if (GetTaskId() != 0)
+        return 0;
+
+    InitializeTunnel();
 
     // Send Start instruction
     ac.command = ARIEL_START_INSTRUCTION;
