@@ -162,4 +162,20 @@ uint32_t ArielFrontendHandler::Process(void* stats, uint64_t memSeq,
     return 0;
 
 }
-                
+
+void ArielFrontendHandler::ProcessInstructions(void* stats, uint64_t memSeq,
+  uint64_t numInsns) {
+    ArielStats* s = (ArielStats*)stats;
+    ArielCommand ac;
+
+    if (GetTaskId() != 0)
+        return;
+
+    InitializeTunnel();
+
+    // Send NOOP instruction for each non memory instruction
+    ac.command = ARIEL_NOOP;
+    ac.instPtr = memSeq;
+    for (auto i = 0; i < numInsns; i++)
+        tunnel->writeMessage(s->GetThread(), ac);
+}

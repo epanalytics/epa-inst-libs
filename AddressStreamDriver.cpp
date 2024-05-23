@@ -906,10 +906,15 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                 ss->SetIsCodeCentric(false);
             }
 
-            // maxNumAddresses is the allocated size of the array when it was 
-            // created, the length is the number of actual elements used
-            (void) handler->Process((void*)ss, memSeq, ldstFlag,
-              stats->addressesForProcessing, length, memvecFlag);
+            if (reference->type == INSN_COUNT) {
+                handler->ProcessInstructions((void*)ss, memSeq,
+                  reference->address);
+            } else {
+                // maxNumAddresses is the allocated size of the array when it
+                // was created, the length is the number of actual elements used
+                (void) handler->Process((void*)ss, memSeq, ldstFlag,
+                  stats->addressesForProcessing, length, memvecFlag);
+            }
         }// for number of handlers
 
         // 0 out addresses array to prevent passing stale data

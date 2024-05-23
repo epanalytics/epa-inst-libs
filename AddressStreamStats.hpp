@@ -40,6 +40,7 @@ enum EntryType: uint8_t {
   VECTOR_ENTRY,
   EPAX_VECTOR_ENTRY,
   EPAX_INDIRECT_ENTRY,
+  INSN_COUNT,
   EntryType_Total
 };
 
