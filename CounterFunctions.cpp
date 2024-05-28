@@ -44,6 +44,9 @@ using namespace std;
 static DataManager<CounterArray*>* AllData = NULL;
 static DynamicInstrumentation* DynamicPoints = NULL;
 static std::set<uint64_t> BlockCountKeys;
+static bool UsedSlicer = false;
+static bool SlicerEnvSet = false;
+static uint32_t SlicerEnvValue = 0;
 
 void print_loop_array(FILE* stream, CounterArray* ctrs){
     if (ctrs == NULL){
@@ -172,6 +175,7 @@ extern "C"
     void pebil_slicer_verbose_start(const char*);
     void pebil_slicer_verbose_pause(const char*);
     void epa_pebil_start() {
+        UsedSlicer = true;
 #ifdef VERBOSE_SLICER
         pebil_slicer_verbose_start("JBB");
 #endif
@@ -182,6 +186,7 @@ extern "C"
     void epa_pebil_start_() { epa_pebil_start(); return; }
 
     void epa_pebil_pause() {
+        UsedSlicer = true;
 #ifdef VERBOSE_SLICER
         pebil_slicer_verbose_pause("JBB");
 #endif
@@ -287,9 +292,10 @@ extern "C"
 
             // If EPA_SLICER_START_OFF is set, then turn inst off
             uint32_t startOff = 0;
-            (void) ReadEnvUint32("EPA_SLICER_START_OFF", &startOff);
+            SlicerEnvSet = ReadEnvUint32("EPA_SLICER_START_OFF", &startOff);
             if (startOff != 0)
                 DynamicPoints->SetDynamicPoints(BlockCountKeys, false);
+            SlicerEnvValue = startOff;
         }
         assert(AllData->allimages.count(*key) == 1);
 
@@ -398,8 +404,14 @@ extern "C"
             BlockFile << "# blockcount      = " << dec << blockCount << ENDL;
         }
         BlockFile
-            << "# loopcount       = " << dec << loopCount << ENDL
-            << ENDL;
+            << "# loopcount       = " << dec << loopCount << ENDL;
+        BlockFile
+            << "# slicer/START_OFF= " << dec << UsedSlicer << " ";
+        if (SlicerEnvSet)
+            BlockFile << dec << SlicerEnvValue << ENDL;
+        else
+            BlockFile << "Undefined" << ENDL;
+        BlockFile << ENDL;
             
         // print image summaries
         BlockFile
