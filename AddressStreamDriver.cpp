@@ -41,6 +41,8 @@
 #include <DataCentricSpatialLocality.hpp>
 #include <DataCentricCacheSimulation.hpp>
 #include <DataCentricReuseDistance.hpp>
+#include <EntropyRange.hpp>
+#include <DataCentricEntropyRange.hpp>
 #include <PrefetchSimulation.hpp>
 #include <SpatialLocalityPerMemOp.hpp>
 #endif
@@ -122,6 +124,7 @@ AddressStreamDriver::AddressStreamDriver() {
     runAddressRange = false;
     runArielFrontend = false;
     runCacheSimulation = true;
+    runEntropyRange = false;
     runHardwarePrefetching = false;
     runReuseDistance = false;
     runScatterLength = false;
@@ -1095,6 +1098,7 @@ void AddressStreamDriver::SetUpTools() {
     uint32_t doAddressRange;
     uint32_t doArielFrontend;
     uint32_t doCacheSimulation;
+    uint32_t doEntropyRange;
     uint32_t doHardwarePrefetching;
     uint32_t doReuseDistance;
     uint32_t doScatterGatherLength;
@@ -1108,6 +1112,9 @@ void AddressStreamDriver::SetUpTools() {
     }
     if (parser->ReadEnvUint32("METASIM_CACHE_SIMULATION", &doCacheSimulation)){
         runCacheSimulation = (doCacheSimulation == 0) ? false : true;
+    }
+    if (parser->ReadEnvUint32("METASIM_ENTROPY_RANGE", &doEntropyRange)){
+        runEntropyRange = (doEntropyRange == 0) ? false : true;
     }
     if (parser->ReadEnvUint32("METASIM_HWPF_SIMULATION", 
       &doHardwarePrefetching)){
@@ -1164,6 +1171,10 @@ void AddressStreamDriver::SetUpTools() {
         tools->push_back(new CacheSimulationTool());
     }
 
+    if (runEntropyRange && runCodeCentric) {
+        tools->push_back(new EntropyRangeTool());
+    }
+
     if (runHardwarePrefetching) {
         if (BuiltWithEPATools()) {
             tools->push_back(GENERATE_PREFETCH_TOOL);
@@ -1216,6 +1227,10 @@ void AddressStreamDriver::SetUpTools() {
 
     if (runCacheSimulation && runDataCentric) {
         tools->push_back(GENERATE_DATA_TOOL(DataCentricCacheSimulationTool));
+    }
+
+    if (runEntropyRange && runDataCentric) {
+        tools->push_back(GENERATE_DATA_TOOL(DataCentricEntropyRangeTool));
     }
 
     if (runReuseDistance && runDataCentric) {

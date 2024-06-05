@@ -64,6 +64,7 @@ ifeq ($(SST_AVAILABLE),yes)
 endif
 
 ifeq ($(EPA_TOOLS_AVAILABLE),yes)
+  ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/EntropyRange.o
   ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/PrefetchSimulation.o
   ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/SpatialLocalityPerMemOp.o
   EXTRA_FLAGS += -DHAS_EPA_TOOLS
@@ -73,6 +74,7 @@ ifeq ($(EPA_TOOLS_AVAILABLE),yes)
     ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/DataCentricAddressRange.o
     ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/DataCentricSpatialLocality.o
     ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/DataCentricCacheSimulation.o
+    ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/DataCentricEntropyRange.o
     ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/DataCentricReuseDistance.o
     EXTRA_FLAGS += -DHAS_DATA_STRUCTURE_MODULE
     ASL_LIBS = -L$(LIBDIR) -ldatastructuremodule

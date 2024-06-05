@@ -29,6 +29,7 @@ class MemoryStreamHandler;
 class SamplingMethod;
 class AddressRangeTool;
 class CacheSimulationTool;
+class EntropyRangeTool;
 class ReuseDistanceTool;
 class ScatterGatherLengthTool;
 class SpatialLocalityTool;
@@ -59,6 +60,7 @@ class AddressStreamDriver {
     bool runAddressRange;
     bool runArielFrontend;
     bool runCacheSimulation;
+    bool runEntropyRange;
     bool runHardwarePrefetching;
     bool runReuseDistance;
     bool runScatterLength;
@@ -142,6 +144,7 @@ class AddressStreamDriver {
     bool IsAddressRange() { return runAddressRange; }
     bool IsArielFrontend() { return runArielFrontend; }
     bool IsCacheSimulation() { return runCacheSimulation; }
+    bool IsEntropyRange() { return runEntropyRange; }
     bool IsHardwarePrefetching() { return runHardwarePrefetching; }
     bool IsReuseDistance() { return runReuseDistance; }
     bool IsScatterLength() { return runScatterLength; }
