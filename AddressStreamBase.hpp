@@ -23,7 +23,10 @@
 
 #include <vector>
 #include <string>
+// for CounterTypes
 #include <AddressStreamStats.hpp>
+// for pebil_map_type
+#include <InstrumentationCommon.hpp>
 
 template <class T> class DataManager;
 class MemoryStreamHandler;

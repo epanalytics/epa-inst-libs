@@ -38,6 +38,7 @@ using namespace std;
 
 // global data
 static AddressStreamDriver* Driver = NULL;
+static bool doesRegWeight = true;
 
 extern "C" {
     void pebil_slicer_verbose_start(const char*);
@@ -67,6 +68,7 @@ extern "C" {
     // Called at just before image initialization
     void* tool_dynamic_init(uint64_t* count, DynamicInst** dyn, bool* 
       isThreadedModeFlag){
+
         pthread_rwlock_wrlock(&dynamic_init_rwlock);
         SAVE_STREAM_FLAGS(cout);
         if (Driver == NULL) {
@@ -77,6 +79,7 @@ extern "C" {
             dynamicPoints = new DynamicInstrumentation();
             Driver->SetDynamicPoints(dynamicPoints);
         }
+
         dynamicPoints->InitializeDynamicInstrumentation(count, dyn,
           isThreadedModeFlag);
         RESTORE_STREAM_FLAGS(cout);
@@ -93,6 +96,7 @@ extern "C" {
 
     // Called before MPI_Finalize is called
     void* tool_pre_mpi_fini() {
+        // data centric being turned on
         Driver->PauseApplicationWrappers();
         return NULL;
     }
@@ -128,7 +132,9 @@ extern "C" {
     }
 
     void* tool_thread_init(thread_key_t tid){
-        init_signal_handlers(true);
+        if (doesRegWeight) {
+            init_signal_handlers(true);
+        }
         if(Driver != NULL)
             Driver->InitializeNewThread(tid);
         return NULL;
@@ -149,6 +155,8 @@ extern "C" {
     void* tool_image_init(void* s, image_key_t* key, ThreadData* td){
         SAVE_STREAM_FLAGS(cout);
         AddressStreamStats* stats = (AddressStreamStats*)s;
+        doesRegWeight = stats->RegWeight;
+        Driver->setRegWeight(doesRegWeight);
 
         assert(stats->Initialized == true);
 
@@ -156,7 +164,12 @@ extern "C" {
 
         // initialize AllData once per address space
         if (Driver->GetAllData() == NULL){
-            init_signal_handlers(true);
+            // EEO TODO is this necessary?
+            if (doesRegWeight) {
+                init_signal_handlers(true);
+            } else {
+                init_signal_handlers();
+            }
             DataManager<AddressStreamStats*>* AllData;
             AllData = new DataManager<AddressStreamStats*>(GenerateStreamStats,
               DeleteStreamStats, ReferenceStreamStats);
@@ -164,9 +177,12 @@ extern "C" {
         }
         assert(Driver);
 
-        bool entered = Driver->EnterTool();
+        bool entered;
+        if (doesRegWeight) 
+            entered = Driver->EnterTool();
         (void) Driver->InitializeNewImage(key, stats, td);
-        Driver->ExitTool(entered);
+        if (doesRegWeight) 
+            Driver->ExitTool(entered);
 
         pthread_rwlock_unlock(&dynamic_init_rwlock);
 
@@ -180,9 +196,12 @@ extern "C" {
         SAVE_STREAM_FLAGS(cout);
 
         image_key_t iid = *key;
-        bool entered = Driver->EnterTool();
+        bool entered;
+        if (doesRegWeight)
+            entered = Driver->EnterTool();
         Driver->ProcessThreadBuffer(iid, pthread_self());
-        Driver->ExitTool(entered);
+        if (doesRegWeight)
+            Driver->ExitTool(entered);
 
         RESTORE_STREAM_FLAGS(cout);
         return NULL;
@@ -194,8 +213,9 @@ extern "C" {
         Driver->PauseApplicationWrappers();
         // Only finalize images once
         static bool finalized = false;
-        if (finalized)
+        if (finalized) {
             return NULL;
+        }
 
         finalized = true;
         (void) Driver->FinalizeImage(key);
@@ -210,6 +230,9 @@ uint64_t ReferenceStreamStats(AddressStreamStats* stats){
     return (uint64_t)stats;
 }
 
+// EEO TODO leaving this alone for now since this is all clean up stuff
+// will need to double check which of these are actually created when doing
+// a light weight run
 void DeleteStreamStats(AddressStreamStats* stats){
     // First delete memory allocated by every image/thread
     // Every image and thread allocates its own stream stats:
@@ -291,27 +314,39 @@ AddressStreamStats* GenerateStreamStats(AddressStreamStats* stats, uint32_t typ,
     assert(stats);
     stats->threadid = tid;
     stats->imageid = iid;
-    stats->FirstImage = (firstimage == iid);
 
-    if(stats->MemopCount > stats->BlockCount) {
-        stats->AllocCount = stats->MemopCount;
-    } else {
-        stats->AllocCount = stats->BlockCount;
+    if (doesRegWeight) {
+        stats->FirstImage = (firstimage == iid);
+
+        if(stats->MemopCount > stats->BlockCount) {
+            stats->AllocCount = stats->MemopCount;
+        } else {
+            stats->AllocCount = stats->BlockCount;
+        }
+
+        // Initialize Stream Stats
+        Driver->InitializeStatsWithNewStreamStats(stats);
+
+        // Initialize with other run data
+        #ifdef EPAX_INST_TOOL
+        stats->maxNumAddresses = 256;
+        #else
+        stats->maxNumAddresses = 64;
+        #endif
+        stats->addressesForProcessing = (uint64_t*)malloc((sizeof(uint64_t) *
+          stats->maxNumAddresses));
     }
 
-    // Initialize Stream Stats
-    Driver->InitializeStatsWithNewStreamStats(stats);
-
-    // Initialize with other run data
-    #ifdef EPAX_INST_TOOL
-    stats->maxNumAddresses = 256;
-    #else
-    stats->maxNumAddresses = 64;
-    #endif
-    stats->addressesForProcessing = (uint64_t*)malloc((sizeof(uint64_t) *
-      stats->maxNumAddresses));
-
-    // Initialize Memory Handlers
+    // Initialize Memory Handlers TODO copied from MemTrace.cpp
+    // Below TODO was copied from the original memtrace implmentation.
+    // I have followed address stream libraries implementation and added flags
+    // where appropriate.
+    // TODO: This is not entirely correct. Handlers should be shared by images
+    // but each thread needs its own handlers. As long as there is only one 
+    // image, this should be fine (or a single-threaded multi-image app). 
+    // But, the first image may not even be the one to spawn the threads so 
+    // this is not a trivial issue.
+    //
     // Modified data generation (from DataManager) to always begin with the 
     // first image. Even if another image spawns the thread, pebil will 
     // GenerateStreamStats for the first image first. This allows us to 
@@ -344,17 +379,19 @@ AddressStreamStats* GenerateStreamStats(AddressStreamStats* stats, uint32_t typ,
         stats->Buffer = fs->Buffer;
     }
 
-    // each thread/image gets its own counters
-    if (typ == DataManagerType_Thread){
-        uint64_t tmp64 = (uint64_t)(stats) + (uint64_t)(sizeof(
-          AddressStreamStats));
-        stats->Counters = (uint64_t*)(tmp64);
+    if (doesRegWeight) {
+        // each thread/image gets its own counters
+        if (typ == DataManagerType_Thread){
+            uint64_t tmp64 = (uint64_t)(stats) + (uint64_t)(sizeof(
+              AddressStreamStats));
+            stats->Counters = (uint64_t*)(tmp64);
 
-        // keep all CounterType_instruction in place
-        memcpy(stats->Counters, s->Counters, sizeof(uint64_t) * s->BlockCount);
-        for (uint32_t i = 0; i < stats->BlockCount; i++){
-            if (stats->Types[i] != CounterType_instruction){
-                stats->Counters[i] = 0;
+            // keep all CounterType_instruction in place
+            memcpy(stats->Counters, s->Counters, sizeof(uint64_t) * s->BlockCount);
+            for (uint32_t i = 0; i < stats->BlockCount; i++){
+                if (stats->Types[i] != CounterType_instruction){
+                    stats->Counters[i] = 0;
+                }
             }
         }
     }

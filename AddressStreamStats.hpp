@@ -22,7 +22,7 @@
 #define _AddressStreamStats_hpp_
 
 //TODO see if below was actually needed
-//#include <Metasim.hpp>
+#include <Metasim.hpp>
 //#define debug(...) __VA_ARGS__
 #define debug(...)
 
@@ -101,10 +101,12 @@ struct EPAXIndirectAddress {
 
 typedef struct BufferEntry_s {
     enum EntryType  type;
-    uint8_t         swprefetchflag;  // Is a software prefetch op
+    // Is a software prefetch op // for lightWeight we use it for passing size
+    uint8_t         swprefetchflag;  
     uint8_t         loadstoreflag;   // Dirty Caching
     uint64_t        imageid;         // Multi-image
-    uint64_t        memseq;          // identifies memop in image
+    // identifies memop in image // for lightWeight we use the raw insnAddrres
+    uint64_t        memseq;          
     union {
         uint64_t address;        // value simulated
         struct VectorAddress vectorAddress;
@@ -137,6 +139,7 @@ typedef struct AddressStreamStats_s {
                         // do this for all blocks within the loop
                         // Note: includes all other blocks in the loop
     bool Master;        // Master image?
+    bool RegWeight;            // Used only by EPAX
     uint32_t SVEVectorLength;  // Used only by EPAX
     uint32_t Phase;
     uint32_t AllocCount;

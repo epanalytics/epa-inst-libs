@@ -54,6 +54,8 @@ typedef enum {
 // Class to hold important variables and functions together
 class AddressStreamDriver {
   private:
+    // are we doing a regulare or light weight run?
+    bool regWeight;
   
     // Are we running these tools?
     bool runAddressRange;
@@ -99,6 +101,8 @@ class AddressStreamDriver {
 
     bool BuiltWithDataStructureModule();
     bool BuiltWithEPATools();
+
+    void setRegWeight(bool _regWeight) { regWeight = _regWeight; }
 
     void CreateFastData(uint64_t capacity);
     virtual void CreateSamplingMethod();
@@ -163,6 +167,7 @@ class AddressStreamDriver {
 
     virtual void SetUpDataStructureModule();
     virtual void SetUpTools();
+    virtual void SetUpLightWeightTool();
 
     void ShutOffInstrumentationInAllBlocks();
     void ShutOffInstrumentationInBlock(uint64_t blockID, uint64_t imageSeq);
