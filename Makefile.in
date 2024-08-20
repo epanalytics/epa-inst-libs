@@ -24,7 +24,7 @@ PEBIL_PAPI_BUILD = @PEBIL_PAPI_BUILD@
 PEBIL_PAPI_PATH = @PEBIL_PAPI_PATH@
 SST_AVAILABLE = @SST_AVAILABLE@
 
-PEBIL_LIBS = libpebilruntime.so libtimer.so libclassifier.so libpfreq.so libtautrace.so libcounter.so libaddressstream.so libpebilslicer.so
+PEBIL_LIBS = libpebilruntime.so libtimer.so libcounter.so libaddressstream.so libpebilslicer.so
 ifeq ($(PEBIL_PAPI_BUILD),yes)
 	PEBIL_LIBS += libpapifunc.so
 endif
