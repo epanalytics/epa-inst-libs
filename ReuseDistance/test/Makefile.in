@@ -22,7 +22,7 @@ TNAME=@PACKAGE@
 TLIB = lib$(TNAME).so
 
 INCLUDE = -I..
-LINK = -dynamic -L.. -l$(TNAME)
+LINK = -L.. -l$(TNAME)
 
 ANSWER = answer.txt
 CORRECT = correct.txt
