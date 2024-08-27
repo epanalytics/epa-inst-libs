@@ -399,7 +399,7 @@ void AddressStreamDriver::InitializeKeys() {
 // Meant to only be called once per image (thus only one thread should 
 // ever call this)
 void* AddressStreamDriver::InitializeNewImage(image_key_t* iid, 
-  AddressStreamStats* stats, ThreadData* threadData){
+  AddressStreamStats* stats, ThreadData* threadData) {
 
     // If already added, just return
     if (allData->allimages.count(*iid) != 0) {
@@ -1017,9 +1017,6 @@ void* AddressStreamDriver::ProcessThreadBuffer(image_key_t iid, thread_key_t
     uint64_t numElements = BUFFER_CURRENT(stats);
     uint64_t capacity = BUFFER_CAPACITY(stats);
 
-    // Thread-safe call
-    uint32_t threadSeq = allData->GetThreadSequence(tid, lock);
-
     if (regWeight) {
         debug(inform << "Thread " << hex << tid << TAB << "Image " << hex 
           << iid << TAB << "Counter " << dec << numElements << TAB 
@@ -1093,7 +1090,7 @@ void* AddressStreamDriver::ProcessThreadBuffer(image_key_t iid, thread_key_t
 
         UnLockDSM(lock);
         DONE_WITH_BUFFER();
-    } else { 
+    } else {
         debug(inform << "Thread " << hex << tid << TAB << "Image " << hex 
           << iid << TAB << "Counter " << dec << numElements << TAB 
           << "Capacity " << dec << capacity << TAB << "Total " << dec 
@@ -1110,11 +1107,6 @@ void* AddressStreamDriver::ProcessThreadBuffer(image_key_t iid, thread_key_t
         BufferEntry* buffer = &(stats->Buffer[1]);
         fastData->Refresh(buffer, numElements, tid, true);
 
-        // Process the buffer for each memory handler
-        // Thread-safe call
-        // need to handle num skipped
-        ProcessBufferForEachHandler(iid, tid, numElements, lock);
-
         // eventually need to be thread safe. Doesn't appear to be used for anything
         //
         // Not thread-safe // AddressStreamDriver does not have this field
@@ -1126,6 +1118,7 @@ void* AddressStreamDriver::ProcessThreadBuffer(image_key_t iid, thread_key_t
 
         DONE_WITH_BUFFER();
     }
+    return NULL;
 }
 
 void AddressStreamDriver::ReadLockDSM(bool lock) {
