@@ -55,7 +55,6 @@ typedef enum {
 class AddressStreamDriver {
   private:
     // are we doing a regulare or light weight run?
-    bool regWeight;
   
     // Are we running these tools?
     bool runAddressRange;
@@ -102,8 +101,6 @@ class AddressStreamDriver {
     bool BuiltWithDataStructureModule();
     bool BuiltWithEPATools();
 
-    void setRegWeight(bool _regWeight) { regWeight = _regWeight; }
-
     void CreateFastData(uint64_t capacity);
     virtual void CreateSamplingMethod();
 
@@ -139,7 +136,9 @@ class AddressStreamDriver {
       ThreadData* threadData);
     void* InitializeNewThread(thread_key_t tid);
     virtual void InitializeStatsWithNewHandlers(AddressStreamStats* stats);
+#ifndef QUICKMEMTRACE
     virtual void InitializeStatsWithNewStreamStats(AddressStreamStats* stats);
+#endif
 
     bool IsAddressRange() { return runAddressRange; }
     bool IsCacheSimulation() { return runCacheSimulation; }
@@ -166,7 +165,9 @@ class AddressStreamDriver {
     //void SetDynamicPoints(bool on);
 
     virtual void SetUpDataStructureModule();
+#ifndef QUICKMEMTRACE
     virtual void SetUpTools();
+#endif
     virtual void SetUpLightWeightTool();
 
     void ShutOffInstrumentationInAllBlocks();

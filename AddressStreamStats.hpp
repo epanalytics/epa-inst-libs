@@ -100,13 +100,18 @@ struct EPAXIndirectAddress {
 };
 
 typedef struct BufferEntry_s {
+#ifndef QUICKMEMTRACE
     enum EntryType  type;
+#endif
     // Is a software prefetch op // for lightWeight we use it for passing size
     uint8_t         swprefetchflag;  
     uint8_t         loadstoreflag;   // Dirty Caching
     uint64_t        imageid;         // Multi-image
     // identifies memop in image // for lightWeight we use the raw insnAddrres
     uint64_t        memseq;          
+#ifdef QUICKMEMTRACE
+    uint64_t        address;
+#else
     union {
         uint64_t address;        // value simulated
         struct VectorAddress vectorAddress;
@@ -115,11 +120,18 @@ typedef struct BufferEntry_s {
         struct EPAXIndirectAddress epaxIndirectAddress;
 #endif
     };
+#endif
     //uint64_t    threadid;        // Error-checking
 } BufferEntry;
+#ifndef QUICKMEMTRACE
 #define __buf_current  vectorAddress.base
 #define __buf_oldPosition  vectorAddress.mask
 #define __buf_capacity memseq
+#else
+#define __buf_current  address
+#define __buf_oldPosition  imageid
+#define __buf_capacity memseq
+#endif
 
 class StreamStats;
 class MemoryStreamHandler;
@@ -139,9 +151,9 @@ typedef struct AddressStreamStats_s {
                         // do this for all blocks within the loop
                         // Note: includes all other blocks in the loop
     bool Master;        // Master image?
-    bool RegWeight;            // Used only by EPAX
     uint32_t SVEVectorLength;  // Used only by EPAX
     uint32_t Phase;
+#ifndef QUICKMEMTRACE
     uint32_t AllocCount;
     uint32_t BlockCount;
     uint32_t GroupCount;
@@ -166,7 +178,9 @@ typedef struct AddressStreamStats_s {
     uint64_t* Addresses;
     uint64_t* GroupIds;
     StreamStats** Stats; // indexed by handler
+#endif
     MemoryStreamHandler** Handlers;
+#ifndef QUICKMEMTRACE
     ReuseDistance** RHandlers;
 
     // per-group data
@@ -175,6 +189,7 @@ typedef struct AddressStreamStats_s {
     // run data
     uint64_t maxNumAddresses;
     uint64_t* addressesForProcessing;
+#endif
 
 } AddressStreamStats;
 

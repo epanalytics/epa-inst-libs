@@ -26,8 +26,11 @@
 #include <AddressStreamBase.hpp>
 #include <AddressStreamDriver.hpp>
 
+#ifdef QUICKMEMTRACE
 #include <MemTrace.hpp>
+#endif
 
+#ifndef QUICKMEMTRACE
 #include <AddressRange.hpp>
 #include <CacheSimulation.hpp>
 #include <ReuseDistanceASI.hpp>
@@ -42,6 +45,7 @@
 #include <PrefetchSimulation.hpp>
 #include <SpatialLocalityPerMemOp.hpp>
 #endif
+#endif // QUICKMEMTRACE
 
 #ifdef HAS_DATA_STRUCTURE_MODULE
 #include <DataStructureModule.hpp>
@@ -65,13 +69,15 @@
 
 using namespace std;
 
-// Define directives to keep #ifdefs out of code
-#ifdef HAS_EPA_TOOLS
-  #define GENERATE_PREFETCH_TOOL new PrefetchSimulationTool()
-  #define GENERATE_SPATIAL_MEMOP_TOOL new SpatialLocalityPerMemOpTool()
-#else
-  #define GENERATE_PREFETCH_TOOL 0
-  #define GENERATE_SPATIAL_MEMOP_TOOL 0
+#ifndef QUICKMEMTRACE
+    // Define directives to keep #ifdefs out of code
+    #ifdef HAS_EPA_TOOLS
+      #define GENERATE_PREFETCH_TOOL new PrefetchSimulationTool()
+      #define GENERATE_SPATIAL_MEMOP_TOOL new SpatialLocalityPerMemOpTool()
+    #else
+      #define GENERATE_PREFETCH_TOOL 0
+      #define GENERATE_SPATIAL_MEMOP_TOOL 0
+    #endif
 #endif
 
 #ifdef HAS_DATA_STRUCTURE_MODULE
@@ -110,8 +116,6 @@ using namespace std;
 // Default Constructor
 AddressStreamDriver::AddressStreamDriver() {
 
-    // assume true for now will set to false if need be
-    regWeight = true;
     // Only run Cache Simulation by default
     runAddressRange = false;
     runCacheSimulation = true;
@@ -224,15 +228,18 @@ void AddressStreamDriver::ExitTool(bool needToExit) {
 
 bool AddressStreamDriver::HasLiveInstrumentationPoints(bool lock) {
     // if there are keys, then still live
-    if (regWeight)
-        sampler->ReadLock(lock);
-    else
-        allData->ReadLock();
+    // TODO these ifdefs could probably be cleaned up left for another time
+#ifndef QUICKMEMTRACE
+    sampler->ReadLock(lock);
+#else
+    allData->ReadLock();
+#endif
     bool stillLive = !(liveMemoryAccessInstPointKeys->empty());
-    if (regWeight)
-        sampler->UnLock(lock);
-    else 
-        allData->UnLock();
+#ifndef QUICKMEMTRACE
+    sampler->UnLock(lock);
+#else
+    allData->UnLock();
+#endif
     return stillLive;
 }
 
@@ -278,13 +285,13 @@ void* AddressStreamDriver::FinalizeImage(image_key_t* key) {
         ProcessThreadBuffer(iid, (*it));
     }
 
-    if (regWeight) {
-        // how is statss different from stats?
-        AddressStreamStats* statss = allData->GetData(iid, pthread_self());
-        string fileName = "";
-        fileName.append(statss->Application);
-        PRINT_DATA_STRUCTURE_REPORT(dataStructureModule, fileName);
-    }
+#ifndef QUICKMEMTRACE
+    // how is statss different from stats?
+    AddressStreamStats* statss = allData->GetData(iid, pthread_self());
+    string fileName = "";
+    fileName.append(statss->Application);
+    PRINT_DATA_STRUCTURE_REPORT(dataStructureModule, fileName);
+#endif
     
     // Create the reports 
     for (vector<AddressStreamTool*>::iterator it = tools->begin(); it !=
@@ -293,23 +300,25 @@ void* AddressStreamDriver::FinalizeImage(image_key_t* key) {
           currentTool->FinalizeTool(allData, sampler);
     }
 
-    if(regWeight && HasLiveInstrumentationPoints())
+#ifndef QUICKMEMTRACE
+    if(HasLiveInstrumentationPoints())
         ShutOffInstrumentationInAllBlocks();
+#endif
     
     double t = (allData->GetTimer(*key, 1) - allData->GetTimer(*key, 0));
     inform << "CXXX Total Execution time for instrumented application " 
       << t << ENDL;
     // TODO Is this right?
-    if (regWeight) {
-        double m = (double)(GetNumMemoryHandlers() * sampler->GetAccessCount());
-        inform << "CXXX - Address Stream Library - Memops simulated per "
-          << "second: " << (m/t) << ENDL;
-    } else {
-        double m = (double)(stats->Phase);
-        inform << "CXXX - Address Stream Library - Memops simulated per "
-          << "second: " << (m/t) << ENDL;
+#ifndef QUICKMEMTRACE
+    double m = (double)(GetNumMemoryHandlers() * sampler->GetAccessCount());
+    inform << "CXXX - Address Stream Library - Memops simulated per "
+      << "second: " << (m/t) << ENDL;
+#else
+    double m = (double)(stats->Phase);
+    inform << "CXXX - Address Stream Library - Memops simulated per "
+      << "second: " << (m/t) << ENDL;
+#endif
 
-    }
     RESTORE_STREAM_FLAGS(cout);
     return NULL;
 }
@@ -332,21 +341,22 @@ void AddressStreamDriver::InitializeAddressStreamDriver(
     allData = d;
 
 
-    if (regWeight) {
-        // Initialize Sampler
-        CreateSamplingMethod();
+#ifndef QUICKMEMTRACE
+    // Initialize Sampler
+    CreateSamplingMethod();
 
-        // Set up the tools!
-        SetUpTools();
+    // Set up the tools!
+    SetUpTools();
 
-        // Set up the data structure module -- Must be done after SetUpTools
-        // Otherwise runDataCentric will not be set
-        if (runDataCentric) {
-            GetAndSetVariableNameFile();
-            SetUpDataStructureModule();
-        }
-    } else 
-        SetUpLightWeightTool();
+    // Set up the data structure module -- Must be done after SetUpTools
+    // Otherwise runDataCentric will not be set
+    if (runDataCentric) {
+        GetAndSetVariableNameFile();
+        SetUpDataStructureModule();
+    }
+#else
+    SetUpLightWeightTool();
+#endif
 
 }
 
@@ -363,8 +373,9 @@ void AddressStreamDriver::InitializeKeys() {
     dynamicPoints->GetAllDynamicKeys(keys);
     // Does the sampler->WriteLock need to be if statement guarded?
     // Memtrace does use it just for AccessCount
-    if (regWeight)
-        sampler->WriteLock();
+#ifndef QUICKMEMTRACE
+    sampler->WriteLock();
+#endif
     for (set<uint64_t>::iterator it = keys.begin(); it != keys.end(); it++) {
         uint64_t k = (*it);
         if (GET_TYPE(k) == PointType_bufferfill && 
@@ -372,28 +383,26 @@ void AddressStreamDriver::InitializeKeys() {
             liveMemoryAccessInstPointKeys->insert(k);
         }
     }
-    if (regWeight)
-        sampler->UnLock();
+#ifndef QUICKMEMTRACE
+    sampler->UnLock();
 
-  
-    if (regWeight) {
-        // Disable them if sampling is turned off
-        if (sampler->GetSamplingFrequency() == 0){
-            inform << "Disabling all simulation-related instrumentation"
-              " because METASIM_SAMPLE_ON is set to 0" << ENDL;
-            ShutOffInstrumentationInAllBlocks();
-        }
-
-        // If EPA_SLICER_START_OFF is set then turn instrumentation off
-        uint32_t startOff = 0;
-        (void) parser->ReadEnvUint32("EPA_SLICER_START_OFF", &startOff);
-        if (startOff != 0) {
-            sampler->WriteLock();
-            //SetDynamicPoints(false);
-            dynamicPoints->SetDynamicPoints(*liveMemoryAccessInstPointKeys, false);
-            sampler->UnLock();
-        }
+    // Disable them if sampling is turned off
+    if (sampler->GetSamplingFrequency() == 0){
+        inform << "Disabling all simulation-related instrumentation"
+          " because METASIM_SAMPLE_ON is set to 0" << ENDL;
+        ShutOffInstrumentationInAllBlocks();
     }
+
+    // If EPA_SLICER_START_OFF is set then turn instrumentation off
+    uint32_t startOff = 0;
+    (void) parser->ReadEnvUint32("EPA_SLICER_START_OFF", &startOff);
+    if (startOff != 0) {
+        sampler->WriteLock();
+        //SetDynamicPoints(false);
+        dynamicPoints->SetDynamicPoints(*liveMemoryAccessInstPointKeys, false);
+        sampler->UnLock();
+    }
+#endif
 }
 
 // Meant to only be called once per image (thus only one thread should 
@@ -436,8 +445,9 @@ void* AddressStreamDriver::InitializeNewImage(image_key_t* iid,
 void* AddressStreamDriver::InitializeNewThread(thread_key_t tid){
     RegisterThreadInDynamicTool();
     bool entered;
-    if (regWeight)
-        entered = EnterTool();
+#ifndef QUICKMEMTRACE
+    entered = EnterTool();
+#endif
     SAVE_STREAM_FLAGS(cout);
     if (allData){
         if(dynamicPoints->IsThreadedMode()) {
@@ -457,8 +467,9 @@ void* AddressStreamDriver::InitializeNewThread(thread_key_t tid){
     }
 
     RESTORE_STREAM_FLAGS(cout);
-    if (regWeight) 
-        ExitTool(entered);
+#ifndef QUICKMEMTRACE
+    ExitTool(entered);
+#endif
     return NULL;
 }
 
@@ -466,10 +477,11 @@ void* AddressStreamDriver::InitializeNewThread(thread_key_t tid){
 void AddressStreamDriver::InitializeStatsWithNewHandlers(AddressStreamStats* 
   stats) {
 
-    if (regWeight) 
-        assert(GetNumMemoryHandlers() > 0);
-    else 
-        assert(GetNumMemoryHandlers() == 1);
+#ifndef QUICKMEMTRACE
+    assert(GetNumMemoryHandlers() > 0);
+#else
+    assert(GetNumMemoryHandlers() == 1);
+#endif
 
     stats->Handlers = new MemoryStreamHandler*[GetNumMemoryHandlers()];
     bzero(stats->Handlers, sizeof(MemoryStreamHandler*) * 
@@ -482,6 +494,7 @@ void AddressStreamDriver::InitializeStatsWithNewHandlers(AddressStreamStats*
     }
 }
 
+#ifndef QUICKMEMTRACE
 // Not thread-safe: a write lock must be held before using
 void AddressStreamDriver::InitializeStatsWithNewStreamStats(AddressStreamStats*
   stats) {
@@ -509,6 +522,7 @@ void AddressStreamDriver::InitializeStatsWithNewStreamStats(AddressStreamStats*
     // Reset AllocCount
     stats->AllocCount = originalAllocCount;
 }
+#endif
 
 void AddressStreamDriver::PauseApplicationWrappers() {
     PAUSE_MODULE(dataStructureModule);
@@ -526,8 +540,9 @@ void AddressStreamDriver::ProcessAllBuffers(ProcessBuffersExtra extra) {
 
     //Suspend all threads
     bool entered;
-    if (regWeight) 
-        entered = EnterTool();
+#ifndef QUICKMEMTRACE
+    entered = EnterTool();
+#endif
     // Get Data Structure Module FIRST, since process_buffer will 
     // take it first too
     WriteLockDSM();
@@ -559,8 +574,9 @@ void AddressStreamDriver::ProcessAllBuffers(ProcessBuffersExtra extra) {
     allData->UnLock();
     fastData->UnLock();
     UnLockDSM();
-    if (regWeight) 
-        ExitTool(entered);
+#ifndef QUICKMEMTRACE
+    ExitTool(entered);
+#endif
 }
 
 //void AddressStreamDriver::ProcessAllBuffers() {
@@ -600,7 +616,9 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
             continue;
         }
         assert(stats != NULL);
+#ifndef QUICKMEMTRACE
         uint64_t maxNumAddresses = stats->maxNumAddresses;
+ #endif
 
         BufferEntry* reference = BUFFER_ENTRY(stats, elementIndex);
         if (reference->imageid == 0){
@@ -616,338 +634,338 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
         bool memvecFlag = false; 
         // for single memory entry, length is one
         uint64_t length = 1;
-        if (regWeight) {
-            if (reference->type == MEM_ENTRY) {
-                if (reference->address != 0) { 
-                    stats->addressesForProcessing[0] = reference->address;
-                    if (runDataCentric)
-                        dataCentricSeq = GET_DATA_STRUCTURE_ID(dataStructureModule, 
-                          reference->address, false);
-                } else {
-                    inform << "found address 0, skipping\n";
-                }
-            // end of if memory entry 
-            } else if (reference->type == VECTOR_ENTRY ) {
-                uint64_t currAddr;
-                uint16_t mask = (reference->vectorAddress).mask;
-                // for vec entry, length is determined by the mask.
-                length = 0;
-                memvecFlag = true;
-                uint32_t loopCheck = (reference->vectorAddress).numIndices;
-                // if this is false, we won't have space to store all of the
-                // addresses in the addresses array.
-                assert(loopCheck <= maxNumAddresses);
-                for (int i = 0; i < loopCheck; i++) {
-                    if (mask % 2 == 1) {
-                        currAddr = (reference->vectorAddress).base
-                          + (reference->vectorAddress).indexVector[i]
-                          * (reference->vectorAddress).scale;
-                        //we start at 0 for length and increment when there
-                        //is an address we are accessing so we can use that
-                        //to keep track of where we are in the array as well
-                        //as its final length
-                        stats->addressesForProcessing[length] = currAddr;
-                        length++;
-                    }// mask check 
-                    mask = (mask >> 1);
-                }// for num of indices
-
-                if (runDataCentric) {
+#ifndef QUICKMEMTRACE
+        if (reference->type == MEM_ENTRY) {
+            if (reference->address != 0) { 
+                stats->addressesForProcessing[0] = reference->address;
+                if (runDataCentric)
                     dataCentricSeq = GET_DATA_STRUCTURE_ID(dataStructureModule, 
-                      stats->addressesForProcessing[0], false);
-                    // Check if we have addresses from different data structures --
-                    // If so, we're gonna need to refactor
-                    for (int i = 1; i < length; i++) {
-                        if (dataCentricSeq != GET_DATA_STRUCTURE_ID(
-                          dataStructureModule, stats->addressesForProcessing[i],
-                          false)) {
+                      reference->address, false);
+            } else {
+                inform << "found address 0, skipping\n";
+            }
+        // end of if memory entry 
+        } else if (reference->type == VECTOR_ENTRY ) {
+            uint64_t currAddr;
+            uint16_t mask = (reference->vectorAddress).mask;
+            // for vec entry, length is determined by the mask.
+            length = 0;
+            memvecFlag = true;
+            uint32_t loopCheck = (reference->vectorAddress).numIndices;
+            // if this is false, we won't have space to store all of the
+            // addresses in the addresses array.
+            assert(loopCheck <= maxNumAddresses);
+            for (int i = 0; i < loopCheck; i++) {
+                if (mask % 2 == 1) {
+                    currAddr = (reference->vectorAddress).base
+                      + (reference->vectorAddress).indexVector[i]
+                      * (reference->vectorAddress).scale;
+                    //we start at 0 for length and increment when there
+                    //is an address we are accessing so we can use that
+                    //to keep track of where we are in the array as well
+                    //as its final length
+                    stats->addressesForProcessing[length] = currAddr;
+                    length++;
+                }// mask check 
+                mask = (mask >> 1);
+            }// for num of indices
 
-                            fprintf(stderr, "WARNING: Multiple data structures in "
-                              "a vector...data will be a little off. The fix will "
-                              "require a small refactor.\n");
-                        }
+            if (runDataCentric) {
+                dataCentricSeq = GET_DATA_STRUCTURE_ID(dataStructureModule, 
+                  stats->addressesForProcessing[0], false);
+                // Check if we have addresses from different data structures --
+                // If so, we're gonna need to refactor
+                for (int i = 1; i < length; i++) {
+                    if (dataCentricSeq != GET_DATA_STRUCTURE_ID(
+                      dataStructureModule, stats->addressesForProcessing[i],
+                      false)) {
+
+                        fprintf(stderr, "WARNING: Multiple data structures in "
+                          "a vector...data will be a little off. The fix will "
+                          "require a small refactor.\n");
                     }
                 }
-            // If EPAX_VECTOR_ENTRY: a masked contiguous vector memop
-            // Currently either takes the form of
-            // ld1d z1.d, p0/z, [x0, x1, LSL #3] or  (scalar plus scalar)
-            // ld1d z0.d, p0/z, [x0, #1, mul vl]     (scalar plus immediate)
-            // Were x0 is the base address and x1 is an index (optionally shifted
-            // so index can go by 1 instead of by datatype size).
-            // Immediates are offsets that are multiplied by the vector length.
-            //
-            // We are given the base address, the maximum amount accessed (i.e.,
-            // before predication), and the number of addresses accessed. From this,
-            // we can calculate which addresses are accessed. Then, we use the
-            // given predicate register value to calculate which addresses were
-            // actually loaded/stored.
+            }
+        // If EPAX_VECTOR_ENTRY: a masked contiguous vector memop
+        // Currently either takes the form of
+        // ld1d z1.d, p0/z, [x0, x1, LSL #3] or  (scalar plus scalar)
+        // ld1d z0.d, p0/z, [x0, #1, mul vl]     (scalar plus immediate)
+        // Were x0 is the base address and x1 is an index (optionally shifted
+        // so index can go by 1 instead of by datatype size).
+        // Immediates are offsets that are multiplied by the vector length.
+        //
+        // We are given the base address, the maximum amount accessed (i.e.,
+        // before predication), and the number of addresses accessed. From this,
+        // we can calculate which addresses are accessed. Then, we use the
+        // given predicate register value to calculate which addresses were
+        // actually loaded/stored.
 #ifdef EPAX_INST_TOOL
-            } else if (reference->type == EPAX_VECTOR_ENTRY) {
-                // The first address accessed (x0 in examples)
-                uint64_t memAddress = reference->epaxVectorAddress.memAddress;
-                // Amount accessed in bytes
-                uint64_t access = reference->epaxVectorAddress.sizeOfAccess / 8;
-                // Number of elements accessed
-                uint16_t numElems = reference->epaxVectorAddress.numElements;
-                // Value of the predicate register (note: stored as bytes)
-                uint8_t* predReg = reference->epaxVectorAddress.predReg;
-                // Size of *accessed* datatype in bytes
-                uint16_t memElemSize = access / numElems;
-                // SVE vector length in bytes
-                uint32_t vecLen = stats->SVEVectorLength / 8;
-                // Size of Z register datatype in bytes (not the same as accessed
-                // datatype! There could be a datatype conversion)
-                uint16_t regElemSize = vecLen / numElems;
+        } else if (reference->type == EPAX_VECTOR_ENTRY) {
+            // The first address accessed (x0 in examples)
+            uint64_t memAddress = reference->epaxVectorAddress.memAddress;
+            // Amount accessed in bytes
+            uint64_t access = reference->epaxVectorAddress.sizeOfAccess / 8;
+            // Number of elements accessed
+            uint16_t numElems = reference->epaxVectorAddress.numElements;
+            // Value of the predicate register (note: stored as bytes)
+            uint8_t* predReg = reference->epaxVectorAddress.predReg;
+            // Size of *accessed* datatype in bytes
+            uint16_t memElemSize = access / numElems;
+            // SVE vector length in bytes
+            uint32_t vecLen = stats->SVEVectorLength / 8;
+            // Size of Z register datatype in bytes (not the same as accessed
+            // datatype! There could be a datatype conversion)
+            uint16_t regElemSize = vecLen / numElems;
 
-                // for epax_vector_entry, length is determined by the mask.
-                length = 0;
-                // For each memory address accessed, calculate the address.
-                // Then, check the predicate to see if the address was
-                // loaded/stored. If so, add it to the addressesForProcessing.
-                for (int elemNum = 0; elemNum < numElems; elemNum++) {
-                    // Calculate the address accessed in memory
-                    uint64_t curAddress = memAddress + (elemNum * memElemSize);
+            // for epax_vector_entry, length is determined by the mask.
+            length = 0;
+            // For each memory address accessed, calculate the address.
+            // Then, check the predicate to see if the address was
+            // loaded/stored. If so, add it to the addressesForProcessing.
+            for (int elemNum = 0; elemNum < numElems; elemNum++) {
+                // Calculate the address accessed in memory
+                uint64_t curAddress = memAddress + (elemNum * memElemSize);
 
-                    // Figure out which is the corresponding bit in the predicate
-                    // register. If the Z register datatype is 1 byte, then each
-                    // bit in the predicate register corresponds to an element in
-                    // the Z register. If the datatype is 2 bytes, then it is every
-                    // other bit. 4 bytes - every 4 bits. 8 bytes - every 8 bits.
-                    //
-                    // Pred reg is stored as 8 bits to an element. First figure out
-                    // which element of the pred reg we want, and then which bit
-                    // in that element is the corresponding one.
-                    uint16_t predRegElemToCheck = (elemNum * regElemSize) / 8;
-                    uint8_t predRegElem = predReg[predRegElemToCheck];
-                    uint8_t bitToCheck = (elemNum * regElemSize) % 8;
+                // Figure out which is the corresponding bit in the predicate
+                // register. If the Z register datatype is 1 byte, then each
+                // bit in the predicate register corresponds to an element in
+                // the Z register. If the datatype is 2 bytes, then it is every
+                // other bit. 4 bytes - every 4 bits. 8 bytes - every 8 bits.
+                //
+                // Pred reg is stored as 8 bits to an element. First figure out
+                // which element of the pred reg we want, and then which bit
+                // in that element is the corresponding one.
+                uint16_t predRegElemToCheck = (elemNum * regElemSize) / 8;
+                uint8_t predRegElem = predReg[predRegElemToCheck];
+                uint8_t bitToCheck = (elemNum * regElemSize) % 8;
 
-                    // If corresponding bit is 1, then we access this address
-                    bool isOn = (predRegElem & (1 << bitToCheck)) != 0;
-                    if (isOn) {
-                        stats->addressesForProcessing[length] = curAddress;
-                        length++;
-                    }
-                } // For each memory address accessed
-                memvecFlag = false;
+                // If corresponding bit is 1, then we access this address
+                bool isOn = (predRegElem & (1 << bitToCheck)) != 0;
+                if (isOn) {
+                    stats->addressesForProcessing[length] = curAddress;
+                    length++;
+                }
+            } // For each memory address accessed
+            memvecFlag = false;
 
-                if (runDataCentric) {
-                    dataCentricSeq = GET_DATA_STRUCTURE_ID(dataStructureModule, 
-                      stats->addressesForProcessing[0], false);
-                    // Check if we have addresses from different data structures --
-                    // This should NOT happen since this a contiguous mem op
-                    for (int i = 1; i < length; i++) {
-                        if (dataCentricSeq != GET_DATA_STRUCTURE_ID(
-                          dataStructureModule, stats->addressesForProcessing[i],
-                          false)) {
+            if (runDataCentric) {
+                dataCentricSeq = GET_DATA_STRUCTURE_ID(dataStructureModule, 
+                  stats->addressesForProcessing[0], false);
+                // Check if we have addresses from different data structures --
+                // This should NOT happen since this a contiguous mem op
+                for (int i = 1; i < length; i++) {
+                    if (dataCentricSeq != GET_DATA_STRUCTURE_ID(
+                      dataStructureModule, stats->addressesForProcessing[i],
+                      false)) {
 
-                            fprintf(stderr, "WARNING: Multiple data structures in "
-                              "a vector...data will be a little off. This probably "
-                              "should not be happening with this memory type.\n");
-                        }
+                        fprintf(stderr, "WARNING: Multiple data structures in "
+                          "a vector...data will be a little off. This probably "
+                          "should not be happening with this memory type.\n");
                     }
                 }
-            // If EPAX_INDIRECT_ENTRY: a masked indirect vector memop (i.e.,
-            // scatter and gathers)
-            // Currently either takes the form of
-            // ld1d z0.d, p0/z, [z1.d, #N]   (vector plus immediate)
-            //   where z1 is a vector of base addresses and #N is a fixed offset
-            // ld1d z0.d, p0/z, [x0, z1.d]   (scalar plus vector)
-            //  where x0 is a base address and z1 is an index (optionally extended
-            //  and/or shifted)
-            //
-            // For the vector plus immediate case, we are given the base vector
-            // (z1 in the example) and the immediate to add to each value in the
-            // base vector.
-            // For the scalar plus scalar case, we are given the base address (x0
-            // in the example), the index vector (z1 in the example), and whether
-            // to sign extend/shift the index.
-            // We are also given the number if addresses accessed (before
-            // predication), and value of the predicate register so we can
-            // determine which addresses were actually loaded/stored.
-            } else if (reference->type == EPAX_INDIRECT_ENTRY) {
-                // The base address, if it has one (otherwise it is 0)
-                uint64_t baseAddress = reference->epaxIndirectAddress.baseAddress;
-                // Does the index need to be extended?
-                uint8_t doesExtension =
-                  reference->epaxIndirectAddress.doesExtension;
-                // If the index is extended, is it signed or unsigned
-                uint8_t signedExtension =
-                  reference->epaxIndirectAddress.signedExtend;
-                // Amount to shift the index (after any extension) -- 0 is no shift
-                uint8_t shiftAmount = reference->epaxIndirectAddress.shiftAmount;
-                // Amount to add to base address (in vector plus immediate case)
-                // 0 if no immediate
-                uint8_t immediate = reference->epaxIndirectAddress.immediate;
-                // The number of elements that will be accessed
-                uint16_t numElements = reference->epaxIndirectAddress.numElements;
-                // Value of the predicate register (note: stored as bytes)
-                uint8_t* predReg = reference->epaxIndirectAddress.predReg;
-                // Value of the Z register (either the base addresses or the
-                // indices) Note: Stored as little endian!
-                uint8_t* baseVector = reference->epaxIndirectAddress.baseVector;
-                // SVE vector length in bits
-                uint32_t vecLen = stats->SVEVectorLength;
-                // Size of Z register datatype in bits (z0 or z1, they should be
-                // the same datatype)
-                uint32_t elemSize = vecLen / numElements;
+            }
+        // If EPAX_INDIRECT_ENTRY: a masked indirect vector memop (i.e.,
+        // scatter and gathers)
+        // Currently either takes the form of
+        // ld1d z0.d, p0/z, [z1.d, #N]   (vector plus immediate)
+        //   where z1 is a vector of base addresses and #N is a fixed offset
+        // ld1d z0.d, p0/z, [x0, z1.d]   (scalar plus vector)
+        //  where x0 is a base address and z1 is an index (optionally extended
+        //  and/or shifted)
+        //
+        // For the vector plus immediate case, we are given the base vector
+        // (z1 in the example) and the immediate to add to each value in the
+        // base vector.
+        // For the scalar plus scalar case, we are given the base address (x0
+        // in the example), the index vector (z1 in the example), and whether
+        // to sign extend/shift the index.
+        // We are also given the number if addresses accessed (before
+        // predication), and value of the predicate register so we can
+        // determine which addresses were actually loaded/stored.
+        } else if (reference->type == EPAX_INDIRECT_ENTRY) {
+            // The base address, if it has one (otherwise it is 0)
+            uint64_t baseAddress = reference->epaxIndirectAddress.baseAddress;
+            // Does the index need to be extended?
+            uint8_t doesExtension =
+              reference->epaxIndirectAddress.doesExtension;
+            // If the index is extended, is it signed or unsigned
+            uint8_t signedExtension =
+              reference->epaxIndirectAddress.signedExtend;
+            // Amount to shift the index (after any extension) -- 0 is no shift
+            uint8_t shiftAmount = reference->epaxIndirectAddress.shiftAmount;
+            // Amount to add to base address (in vector plus immediate case)
+            // 0 if no immediate
+            uint8_t immediate = reference->epaxIndirectAddress.immediate;
+            // The number of elements that will be accessed
+            uint16_t numElements = reference->epaxIndirectAddress.numElements;
+            // Value of the predicate register (note: stored as bytes)
+            uint8_t* predReg = reference->epaxIndirectAddress.predReg;
+            // Value of the Z register (either the base addresses or the
+            // indices) Note: Stored as little endian!
+            uint8_t* baseVector = reference->epaxIndirectAddress.baseVector;
+            // SVE vector length in bits
+            uint32_t vecLen = stats->SVEVectorLength;
+            // Size of Z register datatype in bits (z0 or z1, they should be
+            // the same datatype)
+            uint32_t elemSize = vecLen / numElements;
 
-                // Calculate the addresses that could have been accessed and store
-                // them in a vector (addresses):
-                //    * Convert the Z register (either baseAddresses or indices)
-                //      from little endian (bytes) to big endian (64-bit ints)
-                //      so we can use the value
-                //    * Do a signed extension, if required
-                //    * Do a shift, if required
-                //    * Add it to the immediate, if required
-                //    * Add it to the base address, if required
-                std::vector<uint64_t> addresses;
-                for (size_t i = 0 ; i < numElements; i++) {
-                    uint64_t valToPush;
-                    if (elemSize == 8) {
-                        valToPush = (uint64_t) baseVector[i];
-                        // if we do a sign extension, back fill with 1s if we have
-                        // a 1 in the most significant bit
-                        if (doesExtension == 1 && signedExtension == 1) {
-                            uint8_t bitToExtend = valToPush & 0x80; // signBit
-                            if (bitToExtend != 0) { // fill with 1s
-                                valToPush | 0xffffffffffffff00;
-                            }
+            // Calculate the addresses that could have been accessed and store
+            // them in a vector (addresses):
+            //    * Convert the Z register (either baseAddresses or indices)
+            //      from little endian (bytes) to big endian (64-bit ints)
+            //      so we can use the value
+            //    * Do a signed extension, if required
+            //    * Do a shift, if required
+            //    * Add it to the immediate, if required
+            //    * Add it to the base address, if required
+            std::vector<uint64_t> addresses;
+            for (size_t i = 0 ; i < numElements; i++) {
+                uint64_t valToPush;
+                if (elemSize == 8) {
+                    valToPush = (uint64_t) baseVector[i];
+                    // if we do a sign extension, back fill with 1s if we have
+                    // a 1 in the most significant bit
+                    if (doesExtension == 1 && signedExtension == 1) {
+                        uint8_t bitToExtend = valToPush & 0x80; // signBit
+                        if (bitToExtend != 0) { // fill with 1s
+                            valToPush | 0xffffffffffffff00;
                         }
-                    } else if (elemSize == 16) {
-                        valToPush = baseVector[i*2];
-                        valToPush |= (((uint64_t) baseVector[(i*2)+1]) << 8);
-                        // If the address is supposed to be sign extended
-                        if (doesExtension == 1 && signedExtension == 1) {
-                            uint16_t bitToExtend = valToPush & 0x8000;
-                            if (bitToExtend != 0) { // fill with 1s
-                                valToPush | 0xffffffffffff0000;
-                            }
-                        }
-                    } else if (elemSize == 32) {
-                        valToPush = baseVector[i*4];
-                        valToPush |= (((uint64_t) baseVector[(i*4)+1]) << 8);
-                        valToPush |= (((uint64_t) baseVector[(i*4)+2]) << 16);
-                        valToPush |= (((uint64_t) baseVector[(i*4)+3]) << 24);
-                        // If the address is supposed to be sign extended
-                        if (doesExtension == 1 && signedExtension == 1) {
-                            uint32_t bitToExtend = valToPush & 0x80000000;
-                            if (bitToExtend != 0) { // fill with 1s
-                                valToPush | 0xffffffff00000000;
-                            }
-                        }
-                    } else if (elemSize == 64) {
-                        valToPush = baseVector[i*8];
-                        valToPush |= (((uint64_t) baseVector[(i*8)+1]) << 8);
-                        valToPush |= (((uint64_t) baseVector[(i*8)+2]) << 16);
-                        valToPush |= (((uint64_t) baseVector[(i*8)+3]) << 24);
-                        valToPush |= (((uint64_t) baseVector[(i*8)+4]) << 32);
-                        valToPush |= (((uint64_t) baseVector[(i*8)+5]) << 40);
-                        valToPush |= (((uint64_t) baseVector[(i*8)+6]) << 48);
-                        valToPush |= (((uint64_t) baseVector[(i*8)+7]) << 56);
-                        // can't sign extend 64 bits
-                    } else {
-                        assert(false && "Don't know how to read the Z register" 
-                          " with the given element size");
                     }
-
-                    // Do shift: lsl shift amount (if 0, still correct)
-                    valToPush = valToPush << shiftAmount;
-                    // Add optional immediate (if 0, still correct)
-                    // Note: The immediate is offset * mbytes in ARM documentation
-                    valToPush = valToPush + immediate;
-                    // Add to the base address (if 0, still correct)
-                    valToPush = valToPush + baseAddress;
-                    // Push the final address!
-                    addresses.push_back(valToPush);
+                } else if (elemSize == 16) {
+                    valToPush = baseVector[i*2];
+                    valToPush |= (((uint64_t) baseVector[(i*2)+1]) << 8);
+                    // If the address is supposed to be sign extended
+                    if (doesExtension == 1 && signedExtension == 1) {
+                        uint16_t bitToExtend = valToPush & 0x8000;
+                        if (bitToExtend != 0) { // fill with 1s
+                            valToPush | 0xffffffffffff0000;
+                        }
+                    }
+                } else if (elemSize == 32) {
+                    valToPush = baseVector[i*4];
+                    valToPush |= (((uint64_t) baseVector[(i*4)+1]) << 8);
+                    valToPush |= (((uint64_t) baseVector[(i*4)+2]) << 16);
+                    valToPush |= (((uint64_t) baseVector[(i*4)+3]) << 24);
+                    // If the address is supposed to be sign extended
+                    if (doesExtension == 1 && signedExtension == 1) {
+                        uint32_t bitToExtend = valToPush & 0x80000000;
+                        if (bitToExtend != 0) { // fill with 1s
+                            valToPush | 0xffffffff00000000;
+                        }
+                    }
+                } else if (elemSize == 64) {
+                    valToPush = baseVector[i*8];
+                    valToPush |= (((uint64_t) baseVector[(i*8)+1]) << 8);
+                    valToPush |= (((uint64_t) baseVector[(i*8)+2]) << 16);
+                    valToPush |= (((uint64_t) baseVector[(i*8)+3]) << 24);
+                    valToPush |= (((uint64_t) baseVector[(i*8)+4]) << 32);
+                    valToPush |= (((uint64_t) baseVector[(i*8)+5]) << 40);
+                    valToPush |= (((uint64_t) baseVector[(i*8)+6]) << 48);
+                    valToPush |= (((uint64_t) baseVector[(i*8)+7]) << 56);
+                    // can't sign extend 64 bits
+                } else {
+                    assert(false && "Don't know how to read the Z register" 
+                      " with the given element size");
                 }
 
-                // TODO remove when nolonger necessary?
-                assert(addresses.size() == numElements);
+                // Do shift: lsl shift amount (if 0, still correct)
+                valToPush = valToPush << shiftAmount;
+                // Add optional immediate (if 0, still correct)
+                // Note: The immediate is offset * mbytes in ARM documentation
+                valToPush = valToPush + immediate;
+                // Add to the base address (if 0, still correct)
+                valToPush = valToPush + baseAddress;
+                // Push the final address!
+                addresses.push_back(valToPush);
+            }
 
-                // for epax_indirect_entry, length is determined by the mask.
-                length = 0;
-                // For each memory address accessed, check the predicate to see if
-                // the address was loaded/stored. If so, add it to the
-                // addressesForProcessing.
-                for (int elemNum = 0; elemNum < numElements; elemNum++) {
-                    // Get the address accessed
-                    uint64_t curAddress = addresses[elemNum];
+            // TODO remove when nolonger necessary?
+            assert(addresses.size() == numElements);
 
-                    // Figure out which is the corresponding bit in the predicate
-                    // register. If the Z register datatype is 1 byte, then each
-                    // bit in the predicate register corresponds to an element in
-                    // the Z register. If the datatype is 2 bytes, then it is every
-                    // other bit. 4 bytes - every 4 bits. 8 bytes - every 8 bits.
-                    //
-                    // Pred reg is stored as 8 bits to an element. First figure out
-                    // which element of the pred reg we want, and then which bit
-                    // in that element is the corresponding one.
-                    uint16_t predRegElemToCheck = (elemNum * elemSize) / 64;
-                    uint8_t predRegElem = predReg[predRegElemToCheck];
-                    uint8_t bitToCheck = (elemNum * (elemSize / 8)) % 8;
+            // for epax_indirect_entry, length is determined by the mask.
+            length = 0;
+            // For each memory address accessed, check the predicate to see if
+            // the address was loaded/stored. If so, add it to the
+            // addressesForProcessing.
+            for (int elemNum = 0; elemNum < numElements; elemNum++) {
+                // Get the address accessed
+                uint64_t curAddress = addresses[elemNum];
 
-                    // If corresponding bit is 1, then we access this address
-                    bool isOn = (predRegElem & (1 << bitToCheck)) != 0;
-                    if (isOn) {
-                        stats->addressesForProcessing[length] = curAddress;
-                        length++;
-                    }
-                } // For each memory address accessed
-                
-                memvecFlag = true;
+                // Figure out which is the corresponding bit in the predicate
+                // register. If the Z register datatype is 1 byte, then each
+                // bit in the predicate register corresponds to an element in
+                // the Z register. If the datatype is 2 bytes, then it is every
+                // other bit. 4 bytes - every 4 bits. 8 bytes - every 8 bits.
+                //
+                // Pred reg is stored as 8 bits to an element. First figure out
+                // which element of the pred reg we want, and then which bit
+                // in that element is the corresponding one.
+                uint16_t predRegElemToCheck = (elemNum * elemSize) / 64;
+                uint8_t predRegElem = predReg[predRegElemToCheck];
+                uint8_t bitToCheck = (elemNum * (elemSize / 8)) % 8;
 
-                if (runDataCentric) {
-                    dataCentricSeq = GET_DATA_STRUCTURE_ID(dataStructureModule, 
-                      stats->addressesForProcessing[0], false);
-                    // Check if we have addresses from different data structures --
-                    // If so, we're gonna need to refactor
-                    for (int i = 1; i < length; i++) {
-                        if (dataCentricSeq != GET_DATA_STRUCTURE_ID(
-                          dataStructureModule, stats->addressesForProcessing[i],
-                          false)) {
+                // If corresponding bit is 1, then we access this address
+                bool isOn = (predRegElem & (1 << bitToCheck)) != 0;
+                if (isOn) {
+                    stats->addressesForProcessing[length] = curAddress;
+                    length++;
+                }
+            } // For each memory address accessed
+            
+            memvecFlag = true;
 
-                            fprintf(stderr, "WARNING: Multiple data structures in "
-                              "a vector...data will be a little off. The fix will "
-                              "require a small refactor.\n");
-                        }
+            if (runDataCentric) {
+                dataCentricSeq = GET_DATA_STRUCTURE_ID(dataStructureModule, 
+                  stats->addressesForProcessing[0], false);
+                // Check if we have addresses from different data structures --
+                // If so, we're gonna need to refactor
+                for (int i = 1; i < length; i++) {
+                    if (dataCentricSeq != GET_DATA_STRUCTURE_ID(
+                      dataStructureModule, stats->addressesForProcessing[i],
+                      false)) {
+
+                        fprintf(stderr, "WARNING: Multiple data structures in "
+                          "a vector...data will be a little off. The fix will "
+                          "require a small refactor.\n");
                     }
                 }
+            }
 #endif // EPAX_INST_TOOL
-            } // end of epax indirect address
+        } // end of epax indirect address
 
-            debug(assert(length <= maxNumAddresses));
+        debug(assert(length <= maxNumAddresses));
 
-            // Process for each memory handler
-            for (uint32_t handlerIndex = 0; handlerIndex < GetNumMemoryHandlers(); 
-              handlerIndex++) {
-                MemoryStreamHandler* handler = stats->Handlers[handlerIndex];
-                StreamStats* ss = stats->Stats[handlerIndex];
+        // Process for each memory handler
+        for (uint32_t handlerIndex = 0; handlerIndex < GetNumMemoryHandlers(); 
+          handlerIndex++) {
+            MemoryStreamHandler* handler = stats->Handlers[handlerIndex];
+            StreamStats* ss = stats->Stats[handlerIndex];
 
-                // If this is the first data-centric handler, then change the 
-                // memop ID to the data structure ID
-                if (handlerIndex == numCodeCentricMemoryHandlers) {
-                    memSeq = dataCentricSeq; 
-                }
+            // If this is the first data-centric handler, then change the 
+            // memop ID to the data structure ID
+            if (handlerIndex == numCodeCentricMemoryHandlers) {
+                memSeq = dataCentricSeq; 
+            }
 
-                if (handlerIndex >= numCodeCentricMemoryHandlers) {
-                    ss->SetIsCodeCentric(false);
-                }
+            if (handlerIndex >= numCodeCentricMemoryHandlers) {
+                ss->SetIsCodeCentric(false);
+            }
 
-                // maxNumAddresses is the allocated size of the array when it was 
-                // created, the length is the number of actual elements used
-                (void) handler->Process((void*)ss, memSeq, ldstFlag,
-                  stats->addressesForProcessing, length, memvecFlag);
-            }// for number of handlers
+            // maxNumAddresses is the allocated size of the array when it was 
+            // created, the length is the number of actual elements used
+            (void) handler->Process((void*)ss, memSeq, ldstFlag,
+              stats->addressesForProcessing, length, memvecFlag);
+        }// for number of handlers
 
-            // 0 out addresses array to prevent passing stale data
-            memset(stats->addressesForProcessing, 0, sizeof(uint64_t) *
-              maxNumAddresses);
-            // if regWeight
-        } else {
-            MemoryStreamHandler* handler = stats->Handlers[0];
-            (void) handler->Process(nullptr, memSeq, ldstFlag, nullptr,
-              simulatedAddress, (bool)swprefetchflag);
-        }
+        // 0 out addresses array to prevent passing stale data
+        memset(stats->addressesForProcessing, 0, sizeof(uint64_t) *
+          maxNumAddresses);
+#else
+        // EEO TODO comment what each field is for quick mem trace
+        MemoryStreamHandler* handler = stats->Handlers[0];
+        (void) handler->Process(nullptr, memSeq, ldstFlag, nullptr,
+          simulatedAddress, (bool)swprefetchflag);
+#endif
     }// for elements in the buffer
 
     return numSkipped;
@@ -975,21 +993,21 @@ void* AddressStreamDriver::ProcessThreadBuffer(image_key_t iid, thread_key_t
 #define DONE_WITH_BUFFER(...) BUFFER_CURRENT(stats) = 0;  return NULL;
 
     bool isSampling;
-    if (regWeight) {
-        // Prevent another thread from executing this code for this thread's 
-        // buffer at the same time as this thread. This currently can only 
-        // happen during a data-centric, coming from ProcessAllBuffers.
-        // ProcessAllBuffers takes the data structure module read lock, so 
-        // getting a write lock would prevent it from processing this buffer.
-        // We grab the data structure module read lock so that other threads can 
-        // process their own buffers concurrently and so that we don't change 
-        // anything for a code-centric-only run
-        ReadLockDSM(lock);
+#ifndef QUICKMEMTRACE
+    // Prevent another thread from executing this code for this thread's 
+    // buffer at the same time as this thread. This currently can only 
+    // happen during a data-centric, coming from ProcessAllBuffers.
+    // ProcessAllBuffers takes the data structure module read lock, so 
+    // getting a write lock would prevent it from processing this buffer.
+    // We grab the data structure module read lock so that other threads can 
+    // process their own buffers concurrently and so that we don't change 
+    // anything for a code-centric-only run
+    ReadLockDSM(lock);
 
-        // Check if we are sampling
-        // Thread-safe: Sampling method protected with lock
-        isSampling = sampler->CurrentlySampling(lock);
-    }
+    // Check if we are sampling
+    // Thread-safe: Sampling method protected with lock
+    isSampling = sampler->CurrentlySampling(lock);
+#endif
 
     assert(iid);
     if (allData == NULL){
@@ -1017,107 +1035,107 @@ void* AddressStreamDriver::ProcessThreadBuffer(image_key_t iid, thread_key_t
     uint64_t numElements = BUFFER_CURRENT(stats);
     uint64_t capacity = BUFFER_CAPACITY(stats);
 
-    if (regWeight) {
-        debug(inform << "Thread " << hex << tid << TAB << "Image " << hex 
-          << iid << TAB << "Counter " << dec << numElements << TAB 
-          << "Capacity " << dec << capacity << TAB << "Total " << dec 
-          << sampler->GetAccessCount() << ENDL);
+#ifndef QUICKMEMTRACE
+    debug(inform << "Thread " << hex << tid << TAB << "Image " << hex 
+      << iid << TAB << "Counter " << dec << numElements << TAB 
+      << "Capacity " << dec << capacity << TAB << "Total " << dec 
+      << sampler->GetAccessCount() << ENDL);
 
-        // If there is no more instrumentation, return
-        // Thread-Safe call
-        if (!HasLiveInstrumentationPoints(lock)){
-            UnLockDSM(lock);
-            DONE_WITH_BUFFER();
-        }
-
-        if (isSampling){
-            // Refresh FastStats so it can be used
-            // Thread-safe call
-            BufferEntry* buffer = &(stats->Buffer[1]);
-            fastData->Refresh(buffer, numElements, tid, lock);
-
-            // Process the buffer for each memory handler
-            // Thread-safe call
-            uint64_t numSkipped = ProcessBufferForEachHandler(iid, tid, 
-              numElements, lock);
-            if (numSkipped > 0) {
-                for (uint32_t i = 0; i < GetNumMemoryHandlers(); i++) {
-                    MemoryStreamHandler* m = stats->Handlers[i];
-                    m->SkipAddresses(numSkipped);
-                }
-            }
-
-            // Shut off any instrumentation if sample max is hit
-            // Thread-safe: Calls thread-safe functions
-            ShutOffInstrumentationInMaxedGroups(iid, tid, suspend);
-
-        // if not sampling            
-        } else {
-            // Let each handler know that addresses were skipped
-            // Thread-safe calls since each thread has its own stats/handlers
-            for (uint32_t i = 0; i < GetNumMemoryHandlers(); i++) {
-                MemoryStreamHandler* m = stats->Handlers[i];
-                m->SkipAddresses(numElements);
-            }
-        }
-
-        // Turn sampling on/off
-        // Sampler is thread-safe
-        if (sampler->SwitchesMode(numElements, lock)){
-            if (suspend) {
-                allData->ReadLock();
-                // We are modifiying dynamic points. Use the sampler write 
-                // lock to protect this action
-                sampler->WriteLock();
-                SuspendAllThreads(allData->CountThreads(false), 
-                  allData->allthreads.begin(), allData->allthreads.end());
-            }
-            dynamicPoints->SetDynamicPoints(*liveMemoryAccessInstPointKeys,
-              !(isSampling));
-            if (suspend) {
-                ResumeAllThreads();
-                sampler->UnLock();
-                allData->UnLock();
-            }
-        } // if sampler switches mode
-
-        // Thread-safe
-        sampler->IncrementAccessCount(numElements, lock);
-
-        // Wipe the buffer before exitting to prevent use of stale addresses later
-        // on. Start with element 1, since the 0 element has metadata
-        memset(&(stats->Buffer[1]), 0, sizeof(BufferEntry) * capacity);
-
+    // If there is no more instrumentation, return
+    // Thread-Safe call
+    if (!HasLiveInstrumentationPoints(lock)){
         UnLockDSM(lock);
         DONE_WITH_BUFFER();
-    } else {
-        debug(inform << "Thread " << hex << tid << TAB << "Image " << hex 
-          << iid << TAB << "Counter " << dec << numElements << TAB 
-          << "Capacity " << dec << capacity << TAB << "Total " << dec 
-          << stats->Phase << ENDL);
+    }
 
-        // If there is no more instrumentation, return
-        // Thread-Safe call
-        if (!HasLiveInstrumentationPoints()){
-            DONE_WITH_BUFFER();
-        }
-
+    if (isSampling){
         // Refresh FastStats so it can be used
         // Thread-safe call
         BufferEntry* buffer = &(stats->Buffer[1]);
-        fastData->Refresh(buffer, numElements, tid, true);
+        fastData->Refresh(buffer, numElements, tid, lock);
 
-        // eventually need to be thread safe. Doesn't appear to be used for anything
-        //
-        // Not thread-safe // AddressStreamDriver does not have this field
-        // Phase will keep track of accesscount for light weight
-        // Need to lookup the AddressStreamStats to Image/Thread ratios and make
-        // sure the below is tracked the same way as it would be with sampler.
-        // accessCount += numElements;
-        stats->Phase += numElements;
+        // Process the buffer for each memory handler
+        // Thread-safe call
+        uint64_t numSkipped = ProcessBufferForEachHandler(iid, tid, 
+          numElements, lock);
+        if (numSkipped > 0) {
+            for (uint32_t i = 0; i < GetNumMemoryHandlers(); i++) {
+                MemoryStreamHandler* m = stats->Handlers[i];
+                m->SkipAddresses(numSkipped);
+            }
+        }
 
+        // Shut off any instrumentation if sample max is hit
+        // Thread-safe: Calls thread-safe functions
+        ShutOffInstrumentationInMaxedGroups(iid, tid, suspend);
+
+    // if not sampling            
+    } else {
+        // Let each handler know that addresses were skipped
+        // Thread-safe calls since each thread has its own stats/handlers
+        for (uint32_t i = 0; i < GetNumMemoryHandlers(); i++) {
+            MemoryStreamHandler* m = stats->Handlers[i];
+            m->SkipAddresses(numElements);
+        }
+    }
+
+    // Turn sampling on/off
+    // Sampler is thread-safe
+    if (sampler->SwitchesMode(numElements, lock)){
+        if (suspend) {
+            allData->ReadLock();
+            // We are modifiying dynamic points. Use the sampler write 
+            // lock to protect this action
+            sampler->WriteLock();
+            SuspendAllThreads(allData->CountThreads(false), 
+              allData->allthreads.begin(), allData->allthreads.end());
+        }
+        dynamicPoints->SetDynamicPoints(*liveMemoryAccessInstPointKeys,
+          !(isSampling));
+        if (suspend) {
+            ResumeAllThreads();
+            sampler->UnLock();
+            allData->UnLock();
+        }
+    } // if sampler switches mode
+
+    // Thread-safe
+    sampler->IncrementAccessCount(numElements, lock);
+
+    // Wipe the buffer before exitting to prevent use of stale addresses later
+    // on. Start with element 1, since the 0 element has metadata
+    memset(&(stats->Buffer[1]), 0, sizeof(BufferEntry) * capacity);
+
+    UnLockDSM(lock);
+    DONE_WITH_BUFFER();
+#else
+    debug(inform << "Thread " << hex << tid << TAB << "Image " << hex 
+      << iid << TAB << "Counter " << dec << numElements << TAB 
+      << "Capacity " << dec << capacity << TAB << "Total " << dec 
+      << stats->Phase << ENDL);
+
+    // If there is no more instrumentation, return
+    // Thread-Safe call
+    if (!HasLiveInstrumentationPoints()){
         DONE_WITH_BUFFER();
     }
+
+    // Refresh FastStats so it can be used
+    // Thread-safe call
+    BufferEntry* buffer = &(stats->Buffer[1]);
+    fastData->Refresh(buffer, numElements, tid, true);
+
+    // eventually need to be thread safe. Doesn't appear to be used for anything
+    //
+    // Not thread-safe // AddressStreamDriver does not have this field
+    // Phase will keep track of accesscount for light weight
+    // Need to lookup the AddressStreamStats to Image/Thread ratios and make
+    // sure the below is tracked the same way as it would be with sampler.
+    // accessCount += numElements;
+    stats->Phase += numElements;
+
+    DONE_WITH_BUFFER();
+#endif
     return NULL;
 }
 
@@ -1145,6 +1163,7 @@ void AddressStreamDriver::SetUpDataStructureModule() {
 #endif
 }
 
+#ifndef QUICKMEMTRACE 
 void AddressStreamDriver::SetUpTools() {
     // Check for which tools to use
     uint32_t doAddressRange;
@@ -1276,6 +1295,7 @@ void AddressStreamDriver::SetUpTools() {
         toolIndex++;
     }
 }
+#endif
 
 void AddressStreamDriver::SetUpLightWeightTool() {
     AddressStreamTool* lightTool = new LightWeightTool();
@@ -1358,6 +1378,7 @@ void AddressStreamDriver::ShutOffInstrumentationInBlocks(set<uint64_t>& blocks,
     }
 }
 
+#ifndef QUICKMEMTRACE
 void AddressStreamDriver::ShutOffInstrumentationInMaxedGroups(image_key_t iid, 
   thread_key_t tid, bool suspend) {
 
@@ -1415,6 +1436,7 @@ void AddressStreamDriver::ShutOffInstrumentationInMaxedGroups(image_key_t iid,
         allData->UnLock();
     }
 }
+#endif
 
 void AddressStreamDriver::UnpauseApplicationWrappers() {
     UNPAUSE_MODULE(dataStructureModule);

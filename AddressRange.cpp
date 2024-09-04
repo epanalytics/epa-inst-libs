@@ -18,6 +18,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef QUICKMEMTRACE
+
 #include <InstrumentationCommon.hpp>
 #include <DataManager.hpp>
 #include <Metasim.hpp>
@@ -321,3 +323,4 @@ uint32_t AddressRangeHandler::Process(void* stats, uint64_t memSeq,
     return 0;
 }
                 
+#endif

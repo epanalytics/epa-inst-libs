@@ -38,7 +38,6 @@ using namespace std;
 
 // global data
 static AddressStreamDriver* Driver = NULL;
-static bool doesRegWeight = true;
 
 extern "C" {
     void pebil_slicer_verbose_start(const char*);
@@ -132,9 +131,9 @@ extern "C" {
     }
 
     void* tool_thread_init(thread_key_t tid){
-        if (doesRegWeight) {
-            init_signal_handlers(true);
-        }
+#ifndef QUICKMEMTRACE
+        init_signal_handlers(true);
+#endif
         if(Driver != NULL)
             Driver->InitializeNewThread(tid);
         return NULL;
@@ -155,8 +154,6 @@ extern "C" {
     void* tool_image_init(void* s, image_key_t* key, ThreadData* td){
         SAVE_STREAM_FLAGS(cout);
         AddressStreamStats* stats = (AddressStreamStats*)s;
-        doesRegWeight = stats->RegWeight;
-        Driver->setRegWeight(doesRegWeight);
 
         assert(stats->Initialized == true);
 
@@ -165,11 +162,11 @@ extern "C" {
         // initialize AllData once per address space
         if (Driver->GetAllData() == NULL){
             // EEO TODO is this necessary?
-            if (doesRegWeight) {
-                init_signal_handlers(true);
-            } else {
-                init_signal_handlers();
-            }
+#ifndef QUICKMEMTRACE
+            init_signal_handlers(true);
+#else
+            init_signal_handlers();
+#endif
             DataManager<AddressStreamStats*>* AllData;
             AllData = new DataManager<AddressStreamStats*>(GenerateStreamStats,
               DeleteStreamStats, ReferenceStreamStats);
@@ -178,11 +175,13 @@ extern "C" {
         assert(Driver);
 
         bool entered;
-        if (doesRegWeight) 
-            entered = Driver->EnterTool();
+#ifndef QUICKMEMTRACE
+        entered = Driver->EnterTool();
+#endif
         (void) Driver->InitializeNewImage(key, stats, td);
-        if (doesRegWeight) 
-            Driver->ExitTool(entered);
+#ifndef QUICKMEMTRACE
+        Driver->ExitTool(entered);
+#endif
 
         pthread_rwlock_unlock(&dynamic_init_rwlock);
 
@@ -197,11 +196,13 @@ extern "C" {
 
         image_key_t iid = *key;
         bool entered;
-        if (doesRegWeight)
-            entered = Driver->EnterTool();
+#ifndef QUICKMEMTRACE
+        entered = Driver->EnterTool();
+#endif
         Driver->ProcessThreadBuffer(iid, pthread_self());
-        if (doesRegWeight)
-            Driver->ExitTool(entered);
+#ifndef QUICKMEMTRACE
+        Driver->ExitTool(entered);
+#endif
 
         RESTORE_STREAM_FLAGS(cout);
         return NULL;
@@ -236,6 +237,7 @@ uint64_t ReferenceStreamStats(AddressStreamStats* stats){
 void DeleteStreamStats(AddressStreamStats* stats){
     // First delete memory allocated by every image/thread
     // Every image and thread allocates its own stream stats:
+#ifndef QUICKMEMTRACE
     if (Driver->GetNumMemoryHandlers() > 0 && (stats->Stats != NULL)) {
         for (uint32_t i = 0; i < Driver->GetNumMemoryHandlers(); i++)
             delete stats->Stats[i];
@@ -247,6 +249,7 @@ void DeleteStreamStats(AddressStreamStats* stats){
     if (stats->addressesForProcessing != NULL)
         free(stats->addressesForProcessing);
     stats->addressesForProcessing = NULL;
+#endif
 
     // Next, delete memory allocated for and shared by each thread
     // Only delete it once per thread, so have the first image delete it
@@ -267,10 +270,12 @@ void DeleteStreamStats(AddressStreamStats* stats){
         }
     }
     
+#ifndef QUICKMEMTRACE
     // Lastly, delete AddressStreamStats/Counters (they are allocated together)
     // Every image and non-master thread allocates its own AddressStreamStats
     if (!stats->Initialized)    // If created for thread
         free(stats);
+#endif
 }
 
 // called for every new image and thread
@@ -305,8 +310,12 @@ AddressStreamStats* GenerateStreamStats(AddressStreamStats* stats, uint32_t typ,
     // allows us to avoid an extra memory ref on Counter updates
     if (typ == DataManagerType_Thread) {
         AddressStreamStats* s = stats;
+#ifndef QUICKMEMTRACE
         stats = (AddressStreamStats*)malloc(sizeof(AddressStreamStats) + 
           (sizeof(uint64_t) * stats->BlockCount));
+#else
+        stats = (AddressStreamStats*)malloc(sizeof(AddressStreamStats));
+#endif
         assert(stats && "Couldn't allocate new stats object");
         memcpy(stats, s, sizeof(AddressStreamStats));
         stats->Initialized = false;
@@ -315,27 +324,27 @@ AddressStreamStats* GenerateStreamStats(AddressStreamStats* stats, uint32_t typ,
     stats->threadid = tid;
     stats->imageid = iid;
 
-    if (doesRegWeight) {
-        stats->FirstImage = (firstimage == iid);
+#ifndef QUICKMEMTRACE
+    stats->FirstImage = (firstimage == iid);
 
-        if(stats->MemopCount > stats->BlockCount) {
-            stats->AllocCount = stats->MemopCount;
-        } else {
-            stats->AllocCount = stats->BlockCount;
-        }
-
-        // Initialize Stream Stats
-        Driver->InitializeStatsWithNewStreamStats(stats);
-
-        // Initialize with other run data
-        #ifdef EPAX_INST_TOOL
-        stats->maxNumAddresses = 256;
-        #else
-        stats->maxNumAddresses = 64;
-        #endif
-        stats->addressesForProcessing = (uint64_t*)malloc((sizeof(uint64_t) *
-          stats->maxNumAddresses));
+    if(stats->MemopCount > stats->BlockCount) {
+        stats->AllocCount = stats->MemopCount;
+    } else {
+        stats->AllocCount = stats->BlockCount;
     }
+
+    // Initialize Stream Stats
+    Driver->InitializeStatsWithNewStreamStats(stats);
+
+    // Initialize with other run data
+    #ifdef EPAX_INST_TOOL
+    stats->maxNumAddresses = 256;
+    #else
+    stats->maxNumAddresses = 64;
+    #endif
+    stats->addressesForProcessing = (uint64_t*)malloc((sizeof(uint64_t) *
+      stats->maxNumAddresses));
+#endif
 
     // Initialize Memory Handlers TODO copied from MemTrace.cpp
     // Below TODO was copied from the original memtrace implmentation.
@@ -379,22 +388,22 @@ AddressStreamStats* GenerateStreamStats(AddressStreamStats* stats, uint32_t typ,
         stats->Buffer = fs->Buffer;
     }
 
-    if (doesRegWeight) {
-        // each thread/image gets its own counters
-        if (typ == DataManagerType_Thread){
-            uint64_t tmp64 = (uint64_t)(stats) + (uint64_t)(sizeof(
-              AddressStreamStats));
-            stats->Counters = (uint64_t*)(tmp64);
+#ifndef QUICKMEMTRACE
+    // each thread/image gets its own counters
+    if (typ == DataManagerType_Thread){
+        uint64_t tmp64 = (uint64_t)(stats) + (uint64_t)(sizeof(
+          AddressStreamStats));
+        stats->Counters = (uint64_t*)(tmp64);
 
-            // keep all CounterType_instruction in place
-            memcpy(stats->Counters, s->Counters, sizeof(uint64_t) * s->BlockCount);
-            for (uint32_t i = 0; i < stats->BlockCount; i++){
-                if (stats->Types[i] != CounterType_instruction){
-                    stats->Counters[i] = 0;
-                }
+        // keep all CounterType_instruction in place
+        memcpy(stats->Counters, s->Counters, sizeof(uint64_t) * s->BlockCount);
+        for (uint32_t i = 0; i < stats->BlockCount; i++){
+            if (stats->Types[i] != CounterType_instruction){
+                stats->Counters[i] = 0;
             }
         }
     }
+#endif
 
     return stats;
 }
