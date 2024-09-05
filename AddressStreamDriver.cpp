@@ -618,7 +618,7 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
         assert(stats != NULL);
 #ifndef QUICKMEMTRACE
         uint64_t maxNumAddresses = stats->maxNumAddresses;
- #endif
+#endif
 
         BufferEntry* reference = BUFFER_ENTRY(stats, elementIndex);
         if (reference->imageid == 0){
@@ -1124,6 +1124,10 @@ void* AddressStreamDriver::ProcessThreadBuffer(image_key_t iid, thread_key_t
     // Thread-safe call
     BufferEntry* buffer = &(stats->Buffer[1]);
     fastData->Refresh(buffer, numElements, tid, true);
+
+    // Process the buffer for the memory handler
+    // Thread-safe call 
+    ProcessBufferForEachHandler(iid, tid, numElements, lock);
 
     // eventually need to be thread safe. Doesn't appear to be used for anything
     //
