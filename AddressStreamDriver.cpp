@@ -616,9 +616,9 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
             continue;
         }
         assert(stats != NULL);
-#ifndef QUICKMEMTRACE
+//#ifndef QUICKMEMTRACE
         uint64_t maxNumAddresses = stats->maxNumAddresses;
-#endif
+//#endif
 
         BufferEntry* reference = BUFFER_ENTRY(stats, elementIndex);
         if (reference->imageid == 0){
@@ -634,13 +634,15 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
         bool memvecFlag = false; 
         // for single memory entry, length is one
         uint64_t length = 1;
-#ifndef QUICKMEMTRACE
+//#ifndef QUICKMEMTRACE
         if (reference->type == MEM_ENTRY) {
             if (reference->address != 0) { 
                 stats->addressesForProcessing[0] = reference->address;
+#ifndef QUICKMEMTRACE
                 if (runDataCentric)
                     dataCentricSeq = GET_DATA_STRUCTURE_ID(dataStructureModule, 
                       reference->address, false);
+#endif
             } else {
                 inform << "found address 0, skipping\n";
             }
@@ -670,6 +672,7 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                 mask = (mask >> 1);
             }// for num of indices
 
+#ifndef QUICKMEMTRACE
             if (runDataCentric) {
                 dataCentricSeq = GET_DATA_STRUCTURE_ID(dataStructureModule, 
                   stats->addressesForProcessing[0], false);
@@ -686,6 +689,7 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                     }
                 }
             }
+#endif
         // If EPAX_VECTOR_ENTRY: a masked contiguous vector memop
         // Currently either takes the form of
         // ld1d z1.d, p0/z, [x0, x1, LSL #3] or  (scalar plus scalar)
@@ -748,6 +752,7 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
             } // For each memory address accessed
             memvecFlag = false;
 
+#ifndef QUICKMEMTRACE
             if (runDataCentric) {
                 dataCentricSeq = GET_DATA_STRUCTURE_ID(dataStructureModule, 
                   stats->addressesForProcessing[0], false);
@@ -764,6 +769,7 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                     }
                 }
             }
+#endif
         // If EPAX_INDIRECT_ENTRY: a masked indirect vector memop (i.e.,
         // scatter and gathers)
         // Currently either takes the form of
@@ -914,6 +920,7 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
             
             memvecFlag = true;
 
+#ifndef QUICKMEMTRACE
             if (runDataCentric) {
                 dataCentricSeq = GET_DATA_STRUCTURE_ID(dataStructureModule, 
                   stats->addressesForProcessing[0], false);
@@ -930,11 +937,13 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                     }
                 }
             }
+#endif
 #endif // EPAX_INST_TOOL
         } // end of epax indirect address
 
         debug(assert(length <= maxNumAddresses));
 
+#ifndef QUICKMEMTRACE
         // Process for each memory handler
         for (uint32_t handlerIndex = 0; handlerIndex < GetNumMemoryHandlers(); 
           handlerIndex++) {
@@ -956,16 +965,16 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
             (void) handler->Process((void*)ss, memSeq, ldstFlag,
               stats->addressesForProcessing, length, memvecFlag);
         }// for number of handlers
+#else
+        // EEO TODO comment what each field is for quick mem trace
+        MemoryStreamHandler* handler = stats->Handlers[0];
+        (void) handler->Process(nullptr, memSeq, ldstFlag,
+          stats->addressesForProcessing, length, (bool)swprefetchflag);
+#endif
 
         // 0 out addresses array to prevent passing stale data
         memset(stats->addressesForProcessing, 0, sizeof(uint64_t) *
           maxNumAddresses);
-#else
-        // EEO TODO comment what each field is for quick mem trace
-        MemoryStreamHandler* handler = stats->Handlers[0];
-        (void) handler->Process(nullptr, memSeq, ldstFlag, nullptr,
-          simulatedAddress, (bool)swprefetchflag);
-#endif
     }// for elements in the buffer
 
     return numSkipped;

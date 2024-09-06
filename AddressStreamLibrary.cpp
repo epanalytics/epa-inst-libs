@@ -244,12 +244,12 @@ void DeleteStreamStats(AddressStreamStats* stats){
         delete[] stats->Stats;
     }
     stats->Stats = NULL;
+#endif
 
     // Delete memory allocated for processing addresses (every image/thread)
     if (stats->addressesForProcessing != NULL)
         free(stats->addressesForProcessing);
     stats->addressesForProcessing = NULL;
-#endif
 
     // Next, delete memory allocated for and shared by each thread
     // Only delete it once per thread, so have the first image delete it
@@ -335,6 +335,7 @@ AddressStreamStats* GenerateStreamStats(AddressStreamStats* stats, uint32_t typ,
 
     // Initialize Stream Stats
     Driver->InitializeStatsWithNewStreamStats(stats);
+#endif
 
     // Initialize with other run data
     #ifdef EPAX_INST_TOOL
@@ -344,7 +345,6 @@ AddressStreamStats* GenerateStreamStats(AddressStreamStats* stats, uint32_t typ,
     #endif
     stats->addressesForProcessing = (uint64_t*)malloc((sizeof(uint64_t) *
       stats->maxNumAddresses));
-#endif
 
     // Initialize Memory Handlers TODO copied from MemTrace.cpp
     // Below TODO was copied from the original memtrace implmentation.
