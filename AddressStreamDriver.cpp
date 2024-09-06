@@ -1136,7 +1136,7 @@ void* AddressStreamDriver::ProcessThreadBuffer(image_key_t iid, thread_key_t
 
     // Process the buffer for the memory handler
     // Thread-safe call 
-    ProcessBufferForEachHandler(iid, tid, numElements, lock);
+    (void) ProcessBufferForEachHandler(iid, tid, numElements, lock);
 
     // eventually need to be thread safe. Doesn't appear to be used for anything
     //
