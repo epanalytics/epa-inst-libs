@@ -108,6 +108,24 @@ extern "C" {
         Driver->UnpauseApplicationWrappers();
         return NULL;
     }
+    
+    void* tool_pre_shmem_fini() {
+        Driver->PauseApplicationWrappers();
+        return NULL;
+    }
+    void* tool_pre_shmem_init() {
+        Driver->PauseApplicationWrappers();
+        return NULL;
+    }
+    
+    void* tool_shmem_init(){
+        Driver->UnpauseApplicationWrappers();
+        return NULL;
+    }
+    void* tool_shmem_finalize(){
+        Driver->UnpauseApplicationWrappers();
+        return NULL;
+    }
 
     void* tool_thread_init(thread_key_t tid){
         init_signal_handlers(true);

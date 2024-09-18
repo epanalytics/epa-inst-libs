@@ -56,6 +56,12 @@ extern "C" {
     extern void* tool_mpi_init();
     extern void* tool_pre_mpi_fini();
     extern void* tool_pre_mpi_init();
+   
+    //“TODO: Should we merge these with the mpi functions?”  
+    extern void* tool_pre_shmem_fini();
+    extern void* tool_pre_shmem_init();
+    extern void* tool_shmem_finalize();
+    extern void* tool_shmem_init();
 
     // Entry function when a thread is created by pthread_create
     // However, there may already be threads in existence if this library was loaded late
@@ -97,6 +103,14 @@ static int __ntasks = 1;
 #define __ntasks 1
 #endif //HAVE_MPI
 
+
+#ifdef HAVE_SHMEM
+#ifndef HAVE_MPI
+static int ntasks;
+#define __taskid taskid
+#define __ntasks 1
+#endif
+#endif
 int GetTaskId();
 int GetNTasks();
 

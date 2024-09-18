@@ -24,6 +24,9 @@
 #ifdef HAVE_MPI
 #include <mpi.h>
 #endif
+#ifdef HAVE_SHMEM
+#include <mpp/shmem.h>
+#endif
 
 #include <unistd.h>
 #include <sys/time.h>
@@ -188,6 +191,22 @@ int __wrapper_name(MPI_Init_thread)(int* argc, char*** argv, int required, int* 
 
     return retval;
 }
+void __wrapper_name(shmem_init)(){
+#ifdef HAVE_SHMEM
+    tool_pre_shmem_init();
+    shmem_init();
+    tool_shmem_init();
+    taskid = shmem_my_pe();
+    ntasks = shmem_n_pes();
+#endif
+}
+void __wrapper_name(shmem_finalize)(){
+#ifdef HAVE_SHMEM
+    tool_pre_shmem_fini();
+    shmem_finalize();
+    tool_shmem_finalize();
+#endif
+}
 
 #ifdef USES_PSINSTRACER
 void __give_pebil_name(mpi_init_thread_)(int* required, int* provided, int* ierr){
@@ -209,4 +228,5 @@ void __wrapper_name(mpi_init_thread_)(int* required, int* provided, int* ierr){
     //fprintf(stdout, "-[p%d]- Mapping pid to taskid %d/%d in mpi_init_ wrapper\n", getpid(), __taskid, __ntasks);
     tool_mpi_init();
 }
+
 }; // END extern C

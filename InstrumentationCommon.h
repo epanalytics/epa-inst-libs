@@ -83,6 +83,17 @@ extern void* pebil_get_data_self(pthread_key_t image_id);
 extern void* tool_thread_init(void* args);
 extern void* tool_mpi_init();
 
+extern void* tool_shmem_init();
+extern void* tool_shmem_finalize();
+extern void* tool_pre_shmem_init();
+extern void* tool_pre_shmem_fini();
+#ifdef HAVE_SHMEM
+#include <mpp/shmem.h>
+
+extern int __wrapper_name(shmem_init)();
+extern int __wrapper_name(shmem_finalize)();
+#endif
+
 #ifdef HAVE_MPI
 #define __taskmarker "-[t%d]- "
 #include <mpi.h>

@@ -31,6 +31,8 @@ extern "C" {
     void* tool_pre_mpi_fini();
     void* tool_pre_mpi_init();
     void* tool_mpi_init();
+    void* tool_shmem_fini();
+    void* tool_shmem_init();
     void* tool_thread_init(thread_key_t tid);
     void* tool_thread_fini(thread_key_t tid);
     void* tool_image_init(void* s, image_key_t* key, ThreadData* td);

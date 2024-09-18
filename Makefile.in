@@ -24,7 +24,7 @@ PEBIL_PAPI_BUILD = @PEBIL_PAPI_BUILD@
 PEBIL_PAPI_PATH = @PEBIL_PAPI_PATH@
 SST_AVAILABLE = @SST_AVAILABLE@
 
-PEBIL_LIBS = libpebilruntime.so libtimer.so libclassifier.so libpfreq.so libtautrace.so libcounter.so libaddressstream.so libpebilslicer.so
+PEBIL_LIBS = libpebilruntime.so libtimer.so libcounter.so libaddressstream.so libpebilslicer.so
 ifeq ($(PEBIL_PAPI_BUILD),yes)
 	PEBIL_LIBS += libpapifunc.so
 endif
@@ -35,8 +35,8 @@ BINDIR      = @INST_LIBS_BINDIR@
 LIB_TARGETS = $(foreach pebil_lib,$(PEBIL_LIBS),$(LIBDIR)/$(pebil_lib))
 MPICC       = @MPICC@
 MPICXX      = @MPICXX@
-CFLAGS      = @CFLAGS@ @MPI_FLAGS@ @CPUFREQ_FLAGS@ @THROTTLER_FLAGS@ @PEBIL_DEBUG@ @PEBIL_VERBOSE_SLICER@ @INST_TOOL_FLAGS@ -w
-CXXFLAGS    = @CXXFLAGS@ @MPI_CXXFLAGS@ @MPI_FLAGS@ @CPUFREQ_FLAGS@ @THROTTLER_FLAGS@ @PEBIL_DEBUG@ @PEBIL_VERBOSE_SLICER@ @INST_TOOL_FLAGS@ -w
+CFLAGS      = @CFLAGS@ @MPI_FLAGS@ @CPUFREQ_FLAGS@ @THROTTLER_FLAGS@ @PEBIL_DEBUG@ @PEBIL_VERBOSE_SLICER@ @INST_TOOL_FLAGS@ @SHMEM_FLAGS@ -w
+CXXFLAGS    = @CXXFLAGS@ @MPI_CXXFLAGS@ @MPI_FLAGS@ @CPUFREQ_FLAGS@ @THROTTLER_FLAGS@ @PEBIL_DEBUG@ @PEBIL_VERBOSE_SLICER@ @INST_TOOL_FLAGS@ @SHMEM_FLAGS@ -w
 
 ALL_TARGETS	=	$(LIB_TARGETS)
 
@@ -64,18 +64,20 @@ ifeq ($(SST_AVAILABLE),yes)
 endif
 
 ifeq ($(EPA_TOOLS_AVAILABLE),yes)
+  ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/EntropyRange.o
   ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/PrefetchSimulation.o
   ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/SpatialLocalityPerMemOp.o
   EXTRA_FLAGS += -DHAS_EPA_TOOLS
   EXTRA_INC += -I$(EPA_TOOLS_PATH)/instcode
   # If the Data Structure Module is available
-  ifneq ("$(wildcard $(EPA_TOOLS_PATH)/instcode/libdatastructuremodule.so)", "")
+  ifneq ("$(wildcard $(LIBDIR)/libdatastructuremodule.so)", "")
     ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/DataCentricAddressRange.o
     ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/DataCentricSpatialLocality.o
     ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/DataCentricCacheSimulation.o
+    ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/DataCentricEntropyRange.o
     ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/DataCentricReuseDistance.o
     EXTRA_FLAGS += -DHAS_DATA_STRUCTURE_MODULE
-    ASL_LIBS = -L$(EPA_TOOLS_PATH)/instcode -ldatastructuremodule
+    ASL_LIBS = -L$(LIBDIR) -ldatastructuremodule
     ASL_LIBS += -lunwind
     ASL_LIBS += -L$(EPA_TOOLS_PATH)/external/memory-container/src -lMemContainer
   endif
