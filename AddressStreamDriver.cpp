@@ -300,10 +300,8 @@ void* AddressStreamDriver::FinalizeImage(image_key_t* key) {
           currentTool->FinalizeTool(allData, sampler);
     }
 
-#ifndef QUICKMEMTRACE
     if(HasLiveInstrumentationPoints())
         ShutOffInstrumentationInAllBlocks();
-#endif
     
     double t = (allData->GetTimer(*key, 1) - allData->GetTimer(*key, 0));
     inform << "CXXX Total Execution time for instrumented application " 
@@ -341,10 +339,10 @@ void AddressStreamDriver::InitializeAddressStreamDriver(
     allData = d;
 
 
-#ifndef QUICKMEMTRACE
     // Initialize Sampler
     CreateSamplingMethod();
 
+#ifndef QUICKMEMTRACE
     // Set up the tools!
     SetUpTools();
 
@@ -1310,6 +1308,7 @@ void AddressStreamDriver::SetUpTools() {
 }
 #endif
 
+#ifdef QUICKMEMTRACE
 void AddressStreamDriver::SetUpLightWeightTool() {
     AddressStreamTool* lightTool = new LightWeightTool();
     tools->push_back(lightTool);
@@ -1317,6 +1316,7 @@ void AddressStreamDriver::SetUpLightWeightTool() {
     numCodeCentricTools = tools->size();
     lightTool->CreateHandlers(0, parser);
 }
+#endif
 
 void AddressStreamDriver::ShutOffInstrumentationInAllBlocks() {
     // map of imageSequences -> set of blocks to shut off

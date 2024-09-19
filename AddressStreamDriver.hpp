@@ -167,8 +167,9 @@ class AddressStreamDriver {
     virtual void SetUpDataStructureModule();
 #ifndef QUICKMEMTRACE
     virtual void SetUpTools();
-#endif
+#else
     virtual void SetUpLightWeightTool();
+#endif
 
     void ShutOffInstrumentationInAllBlocks();
     void ShutOffInstrumentationInBlock(uint64_t blockID, uint64_t imageSeq);
