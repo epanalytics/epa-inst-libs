@@ -72,8 +72,7 @@ void ScatterGatherLengthTool::FinalizeTool(DataManager<AddressStreamStats*>*
 
     SGLengthFileName(stats,oFile);
     fileName=oFile.c_str();
-    inform << "Printing scatter gather vector length results to " << 
-      fileName << ENDL;
+    inform << "Printing results to " << fileName << ENDL;
     TryOpen(LengthFile,fileName);
 
     uint64_t sampledCount = 0;
@@ -158,7 +157,7 @@ void ScatterGatherLengthTool::FinalizeTool(DataManager<AddressStreamStats*>*
     LengthFile << "# " << "BLK" << TAB << "Sequence" << TAB << "Hashcode" 
       << TAB << "ImageSequence" << TAB << "ThreadId" << TAB 
       << "BlockCounter" << TAB << "InstructionSimulated" << TAB 
-      << "AvgVecLength" << TAB << "MinVecLength" << TAB << "MaxVecLength" 
+      << "Avg" << TAB << "Min" << TAB << "Max" 
       << ENDL;
 
     for (set<image_key_t>::iterator iit = AllData->allimages.begin(); 

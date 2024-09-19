@@ -23,7 +23,7 @@ EPA_TOOLS_PATH = @PEBIL_SUBDIR_EPA_TOOLS_PATH@
 PEBIL_PAPI_BUILD = @PEBIL_PAPI_BUILD@
 PEBIL_PAPI_PATH = @PEBIL_PAPI_PATH@
 
-PEBIL_LIBS = libpebilruntime.so libtimer.so libclassifier.so libpfreq.so libtautrace.so libcounter.so libaddressstream.so libpebilslicer.so
+PEBIL_LIBS = libpebilruntime.so libtimer.so libcounter.so libaddressstream.so libpebilslicer.so
 ifeq ($(PEBIL_PAPI_BUILD),yes)
 	PEBIL_LIBS += libpapifunc.so
 endif
@@ -57,6 +57,7 @@ SHARED_COMMON_OBJS = $(LIBDIR)/InstrumentationCommon.O $(LIBDIR)/ThreadedCommon.
 ASL_OBJS = $(LIBDIR)/AddressStreamBase.O $(LIBDIR)/AddressRange.O $(LIBDIR)/CacheSimulation.O $(LIBDIR)/ReuseDistanceASI.O $(LIBDIR)/ScatterGatherLength.O $(LIBDIR)/SpatialLocality.O $(LIBDIR)/AddressStreamDriver.O
 
 ifeq ($(EPA_TOOLS_AVAILABLE),yes)
+  ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/EntropyRange.o
   ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/PrefetchSimulation.o
   ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/SpatialLocalityPerMemOp.o
   ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/MemTrace.o
@@ -67,6 +68,7 @@ ifeq ($(EPA_TOOLS_AVAILABLE),yes)
     ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/DataCentricAddressRange.o
     ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/DataCentricSpatialLocality.o
     ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/DataCentricCacheSimulation.o
+    ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/DataCentricEntropyRange.o
     ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/DataCentricReuseDistance.o
     EXTRA_FLAGS += -DHAS_DATA_STRUCTURE_MODULE
     ASL_LIBS = -L$(LIBDIR) -ldatastructuremodule

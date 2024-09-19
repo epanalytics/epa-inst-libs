@@ -23,6 +23,7 @@
 #ifndef _Metasim_hpp_
 #define _Metasim_hpp_
 
+#include <cstdint>
 #include <iostream>
 #include <set>
 

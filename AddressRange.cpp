@@ -322,5 +322,5 @@ uint32_t AddressRangeHandler::Process(void* stats, uint64_t memSeq,
     }
     return 0;
 }
-                
+
 #endif
