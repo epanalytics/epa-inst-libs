@@ -55,8 +55,6 @@ typedef enum {
 // Class to hold important variables and functions together
 class AddressStreamDriver {
   private:
-    // are we doing a regulare or light weight run?
-  
     // Are we running these tools?
     bool runAddressRange;
     bool runCacheSimulation;

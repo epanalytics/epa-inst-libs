@@ -115,7 +115,6 @@ typedef struct BufferEntry_s {
         struct EPAXIndirectAddress epaxIndirectAddress;
 #endif
     };
-//#endif
     //uint64_t    threadid;        // Error-checking
 } BufferEntry;
 #define __buf_current  vectorAddress.base

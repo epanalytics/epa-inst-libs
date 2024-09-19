@@ -161,7 +161,8 @@ extern "C" {
 
         // initialize AllData once per address space
         if (Driver->GetAllData() == NULL){
-            // EEO TODO is this necessary?
+            // EEO TODO is this necessary or can this just be condensed to
+            // init_signal_handlers(true)?
 #ifndef QUICKMEMTRACE
             init_signal_handlers(true);
 #else
@@ -231,9 +232,6 @@ uint64_t ReferenceStreamStats(AddressStreamStats* stats){
     return (uint64_t)stats;
 }
 
-// EEO TODO leaving this alone for now since this is all clean up stuff
-// will need to double check which of these are actually created when doing
-// a light weight run
 void DeleteStreamStats(AddressStreamStats* stats){
     // First delete memory allocated by every image/thread
     // Every image and thread allocates its own stream stats:
