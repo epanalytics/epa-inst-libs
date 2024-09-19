@@ -100,18 +100,13 @@ struct EPAXIndirectAddress {
 };
 
 typedef struct BufferEntry_s {
-//#ifndef QUICKMEMTRACE
     enum EntryType  type;
-//#endif
     // Is a software prefetch op // for lightWeight we use it for passing size
     uint8_t         swprefetchflag;  
     uint8_t         loadstoreflag;   // Dirty Caching
     uint64_t        imageid;         // Multi-image
     // identifies memop in image // for lightWeight we use the raw insnAddrres
     uint64_t        memseq;          
-//#ifdef QUICKMEMTRACE
-//    uint64_t        address;
-//#else
     union {
         uint64_t address;        // value simulated
         struct VectorAddress vectorAddress;
@@ -123,15 +118,9 @@ typedef struct BufferEntry_s {
 //#endif
     //uint64_t    threadid;        // Error-checking
 } BufferEntry;
-//#ifndef QUICKMEMTRACE
 #define __buf_current  vectorAddress.base
 #define __buf_oldPosition  vectorAddress.mask
 #define __buf_capacity memseq
-//#else
-//#define __buf_current  address
-//#define __buf_oldPosition  imageid
-//#define __buf_capacity memseq
-//#endif
 
 class StreamStats;
 class MemoryStreamHandler;

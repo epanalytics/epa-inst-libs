@@ -617,9 +617,7 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
             continue;
         }
         assert(stats != NULL);
-//#ifndef QUICKMEMTRACE
         uint64_t maxNumAddresses = stats->maxNumAddresses;
-//#endif
 
         BufferEntry* reference = BUFFER_ENTRY(stats, elementIndex);
         if (reference->imageid == 0){
@@ -635,7 +633,6 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
         bool memvecFlag = false; 
         // for single memory entry, length is one
         uint64_t length = 1;
-//#ifndef QUICKMEMTRACE
         if (reference->type == MEM_ENTRY) {
             if (reference->address != 0) { 
                 stats->addressesForProcessing[0] = reference->address;
