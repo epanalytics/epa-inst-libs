@@ -131,9 +131,7 @@ extern "C" {
     }
 
     void* tool_thread_init(thread_key_t tid){
-#ifndef QUICKMEMTRACE
         init_signal_handlers(true);
-#endif
         if(Driver != NULL)
             Driver->InitializeNewThread(tid);
         return NULL;
@@ -163,11 +161,7 @@ extern "C" {
         if (Driver->GetAllData() == NULL){
             // EEO TODO is this necessary or can this just be condensed to
             // init_signal_handlers(true)?
-#ifndef QUICKMEMTRACE
             init_signal_handlers(true);
-#else
-            init_signal_handlers();
-#endif
             DataManager<AddressStreamStats*>* AllData;
             AllData = new DataManager<AddressStreamStats*>(GenerateStreamStats,
               DeleteStreamStats, ReferenceStreamStats);
@@ -176,11 +170,11 @@ extern "C" {
         assert(Driver);
 
         bool entered;
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
         entered = Driver->EnterTool();
 #endif
         (void) Driver->InitializeNewImage(key, stats, td);
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
         Driver->ExitTool(entered);
 #endif
 
@@ -197,11 +191,11 @@ extern "C" {
 
         image_key_t iid = *key;
         bool entered;
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
         entered = Driver->EnterTool();
 #endif
         Driver->ProcessThreadBuffer(iid, pthread_self());
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
         Driver->ExitTool(entered);
 #endif
 
@@ -235,7 +229,7 @@ uint64_t ReferenceStreamStats(AddressStreamStats* stats){
 void DeleteStreamStats(AddressStreamStats* stats){
     // First delete memory allocated by every image/thread
     // Every image and thread allocates its own stream stats:
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
     if (Driver->GetNumMemoryHandlers() > 0 && (stats->Stats != NULL)) {
         for (uint32_t i = 0; i < Driver->GetNumMemoryHandlers(); i++)
             delete stats->Stats[i];
@@ -268,7 +262,7 @@ void DeleteStreamStats(AddressStreamStats* stats){
         }
     }
     
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
     // Lastly, delete AddressStreamStats/Counters (they are allocated together)
     // Every image and non-master thread allocates its own AddressStreamStats
     if (!stats->Initialized)    // If created for thread
@@ -308,7 +302,7 @@ AddressStreamStats* GenerateStreamStats(AddressStreamStats* stats, uint32_t typ,
     // allows us to avoid an extra memory ref on Counter updates
     if (typ == DataManagerType_Thread) {
         AddressStreamStats* s = stats;
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
         stats = (AddressStreamStats*)malloc(sizeof(AddressStreamStats) + 
           (sizeof(uint64_t) * stats->BlockCount));
 #else
@@ -322,7 +316,7 @@ AddressStreamStats* GenerateStreamStats(AddressStreamStats* stats, uint32_t typ,
     stats->threadid = tid;
     stats->imageid = iid;
 
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
     stats->FirstImage = (firstimage == iid);
 
     if(stats->MemopCount > stats->BlockCount) {
@@ -386,7 +380,7 @@ AddressStreamStats* GenerateStreamStats(AddressStreamStats* stats, uint32_t typ,
         stats->Buffer = fs->Buffer;
     }
 
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
     // each thread/image gets its own counters
     if (typ == DataManagerType_Thread){
         uint64_t tmp64 = (uint64_t)(stats) + (uint64_t)(sizeof(

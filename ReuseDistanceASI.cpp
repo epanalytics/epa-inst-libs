@@ -18,7 +18,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
 
 #include <InstrumentationCommon.hpp>
 #include <DataManager.hpp>

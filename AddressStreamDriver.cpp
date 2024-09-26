@@ -26,11 +26,11 @@
 #include <AddressStreamBase.hpp>
 #include <AddressStreamDriver.hpp>
 
-#ifdef QUICKMEMTRACE
+#ifdef SLIMSTATS
 #include <MemTrace.hpp>
 #endif
 
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
 #include <AddressRange.hpp>
 #include <CacheSimulation.hpp>
 #include <ReuseDistanceASI.hpp>
@@ -47,7 +47,7 @@
 #include <PrefetchSimulation.hpp>
 #include <SpatialLocalityPerMemOp.hpp>
 #endif
-#endif // QUICKMEMTRACE
+#endif // SLIMSTATS
 
 #ifdef HAS_DATA_STRUCTURE_MODULE
 #include <DataStructureModule.hpp>
@@ -71,7 +71,7 @@
 
 using namespace std;
 
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
     // Define directives to keep #ifdefs out of code
     #ifdef HAS_EPA_TOOLS
       #define GENERATE_PREFETCH_TOOL new PrefetchSimulationTool()
@@ -232,13 +232,13 @@ void AddressStreamDriver::ExitTool(bool needToExit) {
 bool AddressStreamDriver::HasLiveInstrumentationPoints(bool lock) {
     // if there are keys, then still live
     // TODO these ifdefs could probably be cleaned up left for another time
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
     sampler->ReadLock(lock);
 #else
     allData->ReadLock();
 #endif
     bool stillLive = !(liveMemoryAccessInstPointKeys->empty());
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
     sampler->UnLock(lock);
 #else
     allData->UnLock();
@@ -288,11 +288,10 @@ void* AddressStreamDriver::FinalizeImage(image_key_t* key) {
         ProcessThreadBuffer(iid, (*it));
     }
 
-#ifndef QUICKMEMTRACE
-    // how is statss different from stats?
-    AddressStreamStats* statss = allData->GetData(iid, pthread_self());
+#ifndef SLIMSTATS
+    stats = allData->GetData(iid, pthread_self());
     string fileName = "";
-    fileName.append(statss->Application);
+    fileName.append(stats->Application);
     PRINT_DATA_STRUCTURE_REPORT(dataStructureModule, fileName);
 #endif
     
@@ -310,7 +309,7 @@ void* AddressStreamDriver::FinalizeImage(image_key_t* key) {
     inform << "CXXX Total Execution time for instrumented application " 
       << t << ENDL;
     // TODO Is this right?
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
     double m = (double)(GetNumMemoryHandlers() * sampler->GetAccessCount());
     inform << "CXXX - Address Stream Library - Memops simulated per "
       << "second: " << (m/t) << ENDL;
@@ -345,7 +344,7 @@ void AddressStreamDriver::InitializeAddressStreamDriver(
     // Initialize Sampler
     CreateSamplingMethod();
 
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
     // Set up the tools!
     SetUpTools();
 
@@ -356,7 +355,7 @@ void AddressStreamDriver::InitializeAddressStreamDriver(
         SetUpDataStructureModule();
     }
 #else
-    SetUpLightWeightTool();
+    SetUpMemTraceTool();
 #endif
 
 }
@@ -372,11 +371,7 @@ void AddressStreamDriver::InitializeKeys() {
     // buffer (PointType_bufferfill) so the sampler can turn them on/off
     set<uint64_t> keys;
     dynamicPoints->GetAllDynamicKeys(keys);
-    // Does the sampler->WriteLock need to be if statement guarded?
-    // Memtrace does use it just for AccessCount
-#ifndef QUICKMEMTRACE
     sampler->WriteLock();
-#endif
     for (set<uint64_t>::iterator it = keys.begin(); it != keys.end(); it++) {
         uint64_t k = (*it);
         if (GET_TYPE(k) == PointType_bufferfill && 
@@ -384,9 +379,9 @@ void AddressStreamDriver::InitializeKeys() {
             liveMemoryAccessInstPointKeys->insert(k);
         }
     }
-#ifndef QUICKMEMTRACE
     sampler->UnLock();
 
+#ifndef SLIMSTATS
     // Disable them if sampling is turned off
     if (sampler->GetSamplingFrequency() == 0){
         inform << "Disabling all simulation-related instrumentation"
@@ -445,9 +440,8 @@ void* AddressStreamDriver::InitializeNewImage(image_key_t* iid,
 
 void* AddressStreamDriver::InitializeNewThread(thread_key_t tid){
     RegisterThreadInDynamicTool();
-    bool entered;
-#ifndef QUICKMEMTRACE
-    entered = EnterTool();
+#ifndef SLIMSTATS
+    bool entered = EnterTool();
 #endif
     SAVE_STREAM_FLAGS(cout);
     if (allData){
@@ -468,7 +462,7 @@ void* AddressStreamDriver::InitializeNewThread(thread_key_t tid){
     }
 
     RESTORE_STREAM_FLAGS(cout);
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
     ExitTool(entered);
 #endif
     return NULL;
@@ -478,7 +472,7 @@ void* AddressStreamDriver::InitializeNewThread(thread_key_t tid){
 void AddressStreamDriver::InitializeStatsWithNewHandlers(AddressStreamStats* 
   stats) {
 
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
     assert(GetNumMemoryHandlers() > 0);
 #else
     assert(GetNumMemoryHandlers() == 1);
@@ -495,7 +489,7 @@ void AddressStreamDriver::InitializeStatsWithNewHandlers(AddressStreamStats*
     }
 }
 
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
 // Not thread-safe: a write lock must be held before using
 void AddressStreamDriver::InitializeStatsWithNewStreamStats(AddressStreamStats*
   stats) {
@@ -540,9 +534,8 @@ void AddressStreamDriver::PauseApplicationWrappers() {
 void AddressStreamDriver::ProcessAllBuffers(ProcessBuffersExtra extra) {
 
     //Suspend all threads
-    bool entered;
-#ifndef QUICKMEMTRACE
-    entered = EnterTool();
+#ifndef SLIMSTATS
+    bool entered = EnterTool();
 #endif
     // Get Data Structure Module FIRST, since process_buffer will 
     // take it first too
@@ -575,7 +568,7 @@ void AddressStreamDriver::ProcessAllBuffers(ProcessBuffersExtra extra) {
     allData->UnLock();
     fastData->UnLock();
     UnLockDSM();
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
     ExitTool(entered);
 #endif
 }
@@ -592,7 +585,6 @@ void AddressStreamDriver::ProcessAllBuffers(ProcessBuffersExtra extra) {
 
 // Thread-safe function
 // Returns number of elements skipped
-// EEO Add return here to skip logging
 uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid, 
   thread_key_t tid, uint32_t numElementsInBuffer, bool lock) {
 
@@ -606,7 +598,7 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
         debug(assert(elementIndex >= 0));
         debug(assert(elementIndex < numElementsInBuffer));
         debug(assert(faststats[elementIndex]));
-        debug(assert(faststats[elementIndex]->stats));
+        debug(assert(faststats[elementIndex]->Stats));
 
         AddressStreamStats* stats = faststats[elementIndex];
         // If stats is null, then this buffer entry was empty.
@@ -624,11 +616,10 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
             debug(assert(AllData->CountThreads() > 1));
             continue;
         }
-        uint64_t simulatedAddress = reference->address;
         uint64_t memSeq = reference->memseq;
         uint64_t dataCentricSeq = reference->memseq;
         bool ldstFlag = reference->loadstoreflag;
-        // for lightWeight
+        // for memTrace
         uint8_t swprefetchflag = reference->swprefetchflag;
         bool memvecFlag = false; 
         // for single memory entry, length is one
@@ -636,7 +627,7 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
         if (reference->type == MEM_ENTRY) {
             if (reference->address != 0) { 
                 stats->addressesForProcessing[0] = reference->address;
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
                 if (runDataCentric)
                     dataCentricSeq = GET_DATA_STRUCTURE_ID(dataStructureModule, 
                       reference->address, false);
@@ -670,7 +661,7 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                 mask = (mask >> 1);
             }// for num of indices
 
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
             if (runDataCentric) {
                 dataCentricSeq = GET_DATA_STRUCTURE_ID(dataStructureModule, 
                   stats->addressesForProcessing[0], false);
@@ -750,7 +741,7 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
             } // For each memory address accessed
             memvecFlag = false;
 
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
             if (runDataCentric) {
                 dataCentricSeq = GET_DATA_STRUCTURE_ID(dataStructureModule, 
                   stats->addressesForProcessing[0], false);
@@ -918,7 +909,7 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
             
             memvecFlag = true;
 
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
             if (runDataCentric) {
                 dataCentricSeq = GET_DATA_STRUCTURE_ID(dataStructureModule, 
                   stats->addressesForProcessing[0], false);
@@ -941,7 +932,7 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
 
         debug(assert(length <= maxNumAddresses));
 
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
         // Process for each memory handler
         for (uint32_t handlerIndex = 0; handlerIndex < GetNumMemoryHandlers(); 
           handlerIndex++) {
@@ -964,10 +955,15 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
               stats->addressesForProcessing, length, memvecFlag);
         }// for number of handlers
 #else
-        // EEO TODO comment what each field is for quick mem trace
+        // memSeq is the insnAddress, 
+        // ldstFlag, addressesForProcessing, and lenght remains unchanged
+        // swprefetchFlag is used to convey size.
         MemoryStreamHandler* handler = stats->Handlers[0];
         (void) handler->Process(nullptr, memSeq, ldstFlag,
           stats->addressesForProcessing, length, (bool)swprefetchflag);
+
+        // for keeping track of total memops.
+        stats->Phase += length;
 #endif
 
         // 0 out addresses array to prevent passing stale data
@@ -999,8 +995,7 @@ void* AddressStreamDriver::ProcessThreadBuffer(image_key_t iid, thread_key_t
 
 #define DONE_WITH_BUFFER(...) BUFFER_CURRENT(stats) = 0;  return NULL;
 
-    bool isSampling;
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
     // Prevent another thread from executing this code for this thread's 
     // buffer at the same time as this thread. This currently can only 
     // happen during a data-centric, coming from ProcessAllBuffers.
@@ -1013,7 +1008,7 @@ void* AddressStreamDriver::ProcessThreadBuffer(image_key_t iid, thread_key_t
 
     // Check if we are sampling
     // Thread-safe: Sampling method protected with lock
-    isSampling = sampler->CurrentlySampling(lock);
+    bool isSampling = sampler->CurrentlySampling(lock);
 #endif
 
     assert(iid);
@@ -1042,7 +1037,7 @@ void* AddressStreamDriver::ProcessThreadBuffer(image_key_t iid, thread_key_t
     uint64_t numElements = BUFFER_CURRENT(stats);
     uint64_t capacity = BUFFER_CAPACITY(stats);
 
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
     debug(inform << "Thread " << hex << tid << TAB << "Image " << hex 
       << iid << TAB << "Counter " << dec << numElements << TAB 
       << "Capacity " << dec << capacity << TAB << "Total " << dec 
@@ -1136,15 +1131,6 @@ void* AddressStreamDriver::ProcessThreadBuffer(image_key_t iid, thread_key_t
     // Thread-safe call 
     (void) ProcessBufferForEachHandler(iid, tid, numElements, lock);
 
-    // eventually need to be thread safe. Doesn't appear to be used for anything
-    //
-    // Not thread-safe // AddressStreamDriver does not have this field
-    // Phase will keep track of accesscount for light weight
-    // Need to lookup the AddressStreamStats to Image/Thread ratios and make
-    // sure the below is tracked the same way as it would be with sampler.
-    // accessCount += numElements;
-    stats->Phase += numElements;
-
     DONE_WITH_BUFFER();
 #endif
     return NULL;
@@ -1174,7 +1160,7 @@ void AddressStreamDriver::SetUpDataStructureModule() {
 #endif
 }
 
-#ifndef QUICKMEMTRACE 
+#ifndef SLIMSTATS 
 void AddressStreamDriver::SetUpTools() {
     // Check for which tools to use
     uint32_t doAddressRange;
@@ -1320,13 +1306,13 @@ void AddressStreamDriver::SetUpTools() {
 }
 #endif
 
-#ifdef QUICKMEMTRACE
-void AddressStreamDriver::SetUpLightWeightTool() {
-    AddressStreamTool* lightTool = new LightWeightTool();
-    tools->push_back(lightTool);
+#ifdef SLIMSTATS
+void AddressStreamDriver::SetUpMemTraceTool() {
+    AddressStreamTool* memTraceTool = new MemTraceTool();
+    tools->push_back(memTraceTool);
     numMemoryHandlers = 1;
     numCodeCentricTools = tools->size();
-    lightTool->CreateHandlers(0, parser);
+    memTraceTool->CreateHandlers(0, parser);
 }
 #endif
 
@@ -1403,7 +1389,7 @@ void AddressStreamDriver::ShutOffInstrumentationInBlocks(set<uint64_t>& blocks,
     }
 }
 
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
 void AddressStreamDriver::ShutOffInstrumentationInMaxedGroups(image_key_t iid, 
   thread_key_t tid, bool suspend) {
 

@@ -136,7 +136,7 @@ class AddressStreamDriver {
       ThreadData* threadData);
     void* InitializeNewThread(thread_key_t tid);
     virtual void InitializeStatsWithNewHandlers(AddressStreamStats* stats);
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
     virtual void InitializeStatsWithNewStreamStats(AddressStreamStats* stats);
 #endif
 
@@ -166,10 +166,10 @@ class AddressStreamDriver {
     //void SetDynamicPoints(bool on);
 
     virtual void SetUpDataStructureModule();
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
     virtual void SetUpTools();
 #else
-    virtual void SetUpLightWeightTool();
+    virtual void SetUpMemTraceTool();
 #endif
 
     void ShutOffInstrumentationInAllBlocks();

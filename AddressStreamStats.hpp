@@ -101,11 +101,11 @@ struct EPAXIndirectAddress {
 
 typedef struct BufferEntry_s {
     enum EntryType  type;
-    // Is a software prefetch op // for lightWeight we use it for passing size
+    // Is a software prefetch op // for MemTrace we use it for passing size
     uint8_t         swprefetchflag;  
     uint8_t         loadstoreflag;   // Dirty Caching
     uint64_t        imageid;         // Multi-image
-    // identifies memop in image // for lightWeight we use the raw insnAddrres
+    // identifies memop in image // for MemTrace we use the raw insnAddrres
     uint64_t        memseq;          
     union {
         uint64_t address;        // value simulated
@@ -141,7 +141,7 @@ typedef struct AddressStreamStats_s {
     bool Master;        // Master image?
     uint32_t SVEVectorLength;  // Used only by EPAX
     uint32_t Phase;
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
     uint32_t AllocCount;
     uint32_t BlockCount;
     uint32_t GroupCount;
@@ -168,7 +168,7 @@ typedef struct AddressStreamStats_s {
     StreamStats** Stats; // indexed by handler
 #endif
     MemoryStreamHandler** Handlers;
-#ifndef QUICKMEMTRACE
+#ifndef SLIMSTATS
     ReuseDistance** RHandlers;
 
     // per-group data
