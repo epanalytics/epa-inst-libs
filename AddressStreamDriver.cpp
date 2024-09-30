@@ -955,12 +955,15 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
               stats->addressesForProcessing, length, memvecFlag);
         }// for number of handlers
 #else
+        // stats holds a pointer to size (up and down converted)
         // memSeq is the insnAddress, 
         // ldstFlag, addressesForProcessing, and lenght remains unchanged
-        // swprefetchFlag is used to convey size.
+        // swprefetchFlag is unused
+        uint64_t temp = (uint64_t) swprefetchflag;
         MemoryStreamHandler* handler = stats->Handlers[0];
-        (void) handler->Process(nullptr, memSeq, ldstFlag,
-          stats->addressesForProcessing, length, (bool)swprefetchflag);
+        (void) handler->Process(&swprefetchflag, memSeq, ldstFlag,
+          stats->addressesForProcessing, length, swprefetchflag);
+          //stats->addressesForProcessing, length, (bool)swprefetchflag);
 
         // for keeping track of total memops.
         stats->Phase += length;
