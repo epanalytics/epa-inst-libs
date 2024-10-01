@@ -334,15 +334,6 @@ AddressStreamStats* GenerateStreamStats(AddressStreamStats* stats, uint32_t typ,
       stats->maxNumAddresses));
 
     // Initialize Memory Handlers TODO copied from MemTrace.cpp
-    // Below TODO was copied from the original memtrace implmentation.
-    // I have followed address stream libraries implementation and added flags
-    // where appropriate.
-    // TODO: This is not entirely correct. Handlers should be shared by images
-    // but each thread needs its own handlers. As long as there is only one 
-    // image, this should be fine (or a single-threaded multi-image app). 
-    // But, the first image may not even be the one to spawn the threads so 
-    // this is not a trivial issue.
-    //
     // Modified data generation (from DataManager) to always begin with the 
     // first image. Even if another image spawns the thread, pebil will 
     // GenerateStreamStats for the first image first. This allows us to 
@@ -352,10 +343,7 @@ AddressStreamStats* GenerateStreamStats(AddressStreamStats* stats, uint32_t typ,
         Driver->InitializeStatsWithNewHandlers(stats);
     } else {
         // Other images would share the handlers
-        // Calls ReadLock - Release lock
-        //allData->UnLock();
         AddressStreamStats* fs = allData->GetData(firstimage, tid, false);
-        //allData->WriteLock();
         stats->Handlers = fs->Handlers;
     }
 

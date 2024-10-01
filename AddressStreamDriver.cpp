@@ -232,17 +232,9 @@ void AddressStreamDriver::ExitTool(bool needToExit) {
 bool AddressStreamDriver::HasLiveInstrumentationPoints(bool lock) {
     // if there are keys, then still live
     // TODO these ifdefs could probably be cleaned up left for another time
-#ifndef SLIMSTATS
     sampler->ReadLock(lock);
-#else
-    allData->ReadLock();
-#endif
     bool stillLive = !(liveMemoryAccessInstPointKeys->empty());
-#ifndef SLIMSTATS
     sampler->UnLock(lock);
-#else
-    allData->UnLock();
-#endif
     return stillLive;
 }
 
