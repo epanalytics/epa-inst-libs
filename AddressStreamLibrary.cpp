@@ -159,7 +159,6 @@ extern "C" {
 
         // initialize AllData once per address space
         if (Driver->GetAllData() == NULL){
-            // EEO TODO is this necessary or can this just be condensed to
             // init_signal_handlers(true)?
             init_signal_handlers(true);
             DataManager<AddressStreamStats*>* AllData;
@@ -169,9 +168,8 @@ extern "C" {
         }
         assert(Driver);
 
-        bool entered;
 #ifndef SLIMSTATS
-        entered = Driver->EnterTool();
+        bool entered = Driver->EnterTool();
 #endif
         (void) Driver->InitializeNewImage(key, stats, td);
 #ifndef SLIMSTATS
@@ -190,9 +188,8 @@ extern "C" {
         SAVE_STREAM_FLAGS(cout);
 
         image_key_t iid = *key;
-        bool entered;
 #ifndef SLIMSTATS
-        entered = Driver->EnterTool();
+        bool entered = Driver->EnterTool();
 #endif
         Driver->ProcessThreadBuffer(iid, pthread_self());
 #ifndef SLIMSTATS
@@ -226,7 +223,7 @@ uint64_t ReferenceStreamStats(AddressStreamStats* stats){
     return (uint64_t)stats;
 }
 
-void DeleteStreamStats(AddressStreamStats* stats){
+void DeleteStreamStats(AddressStreamStats* stats) {
     // First delete memory allocated by every image/thread
     // Every image and thread allocates its own stream stats:
 #ifndef SLIMSTATS
@@ -262,12 +259,10 @@ void DeleteStreamStats(AddressStreamStats* stats){
         }
     }
     
-#ifndef SLIMSTATS
     // Lastly, delete AddressStreamStats/Counters (they are allocated together)
     // Every image and non-master thread allocates its own AddressStreamStats
     if (!stats->Initialized)    // If created for thread
         free(stats);
-#endif
 }
 
 // called for every new image and thread

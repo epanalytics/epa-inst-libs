@@ -289,7 +289,6 @@ void* AddressStreamDriver::FinalizeImage(image_key_t* key) {
     }
 
 #ifndef SLIMSTATS
-    stats = allData->GetData(iid, pthread_self());
     string fileName = "";
     fileName.append(stats->Application);
     PRINT_DATA_STRUCTURE_REPORT(dataStructureModule, fileName);
