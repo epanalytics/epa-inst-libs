@@ -231,7 +231,6 @@ void AddressStreamDriver::ExitTool(bool needToExit) {
 
 bool AddressStreamDriver::HasLiveInstrumentationPoints(bool lock) {
     // if there are keys, then still live
-    // TODO these ifdefs could probably be cleaned up left for another time
     sampler->ReadLock(lock);
     bool stillLive = !(liveMemoryAccessInstPointKeys->empty());
     sampler->UnLock(lock);
@@ -954,7 +953,6 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
         MemoryStreamHandler* handler = stats->Handlers[0];
         (void) handler->Process(&swprefetchflag, memSeq, ldstFlag,
           stats->addressesForProcessing, length, swprefetchflag);
-          //stats->addressesForProcessing, length, (bool)swprefetchflag);
 
         // for keeping track of total memops.
         stats->Phase += length;

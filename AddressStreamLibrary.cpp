@@ -159,7 +159,6 @@ extern "C" {
 
         // initialize AllData once per address space
         if (Driver->GetAllData() == NULL){
-            // init_signal_handlers(true)?
             init_signal_handlers(true);
             DataManager<AddressStreamStats*>* AllData;
             AllData = new DataManager<AddressStreamStats*>(GenerateStreamStats,
@@ -333,7 +332,7 @@ AddressStreamStats* GenerateStreamStats(AddressStreamStats* stats, uint32_t typ,
     stats->addressesForProcessing = (uint64_t*)malloc((sizeof(uint64_t) *
       stats->maxNumAddresses));
 
-    // Initialize Memory Handlers TODO copied from MemTrace.cpp
+    // Initialize Memory Handlers 
     // Modified data generation (from DataManager) to always begin with the 
     // first image. Even if another image spawns the thread, pebil will 
     // GenerateStreamStats for the first image first. This allows us to 
