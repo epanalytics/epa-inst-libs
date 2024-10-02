@@ -39,11 +39,15 @@ namespace SST {
   }
 }
 
+class ArielFrontendHandler;
+
 class ArielFrontendTool : public AddressStreamTool {
   protected:
-    std::string ShmemName = "";
+    std::string shmemName = "";
+    ArielFrontendHandler* tunnelCreator;
   public:
-    ArielFrontendTool() : AddressStreamTool() {}
+    ArielFrontendTool() : AddressStreamTool(), shmemName(""),
+      tunnelCreator(NULL) {}
     virtual void AddNewHandlers(AddressStreamStats* stats);
     virtual void AddNewStreamStats(AddressStreamStats* stats);
     virtual uint32_t CreateHandlers(uint32_t index, StringParser* parser);
@@ -82,11 +86,12 @@ private:
     SST::Core::Interprocess::SHMChild<SST::ArielComponent::ArielTunnel>*
       tunnelmgr;
     SST::ArielComponent::ArielTunnel* tunnel;
-    std::string ShmemName;
+    std::string shmemName;
 public:
     ArielFrontendHandler(std::string n);
     ~ArielFrontendHandler();
 
+    void FinalizeTunnel();
     void InitializeTunnel();
     void Print(std::ofstream& f);
     uint32_t Process(void* stats, uint64_t memSeq, bool ldstFlag,

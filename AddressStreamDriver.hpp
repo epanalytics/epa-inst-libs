@@ -113,6 +113,7 @@ class AddressStreamDriver {
     void ExitTool(bool needToExit);
 
     void* FinalizeImage(image_key_t*);
+    void FinalizeThread(thread_key_t tid);
 
     DataManager<AddressStreamStats*>* GetAllData() { return allData; }
     void GetAndSetVariableNameFile();

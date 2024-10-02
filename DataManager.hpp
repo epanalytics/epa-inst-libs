@@ -141,7 +141,7 @@ private:
 
         T data = datamap[iid][tid];
         datadel(data);
-        datamap[iid].erase(tid);
+        (void) datamap[iid].erase(tid);
     }
 
     void RemoveThread() {
@@ -160,7 +160,7 @@ private:
             RemoveData((*iit), tid);
             RemoveThreadData((*iit), tid);
         }
-        donethreads.erase(tid);
+        (void) donethreads.erase(tid);
         UnLock();
     }
 
@@ -176,6 +176,7 @@ public:
     }
 
     std::set<thread_key_t> allthreads;
+    std::set<thread_key_t> livethreads;
     std::set<thread_key_t> donethreads;
     std::set<image_key_t> allimages;
 
@@ -293,8 +294,9 @@ public:
 
     void FinishThread(thread_key_t tid){
         WriteLock();
-        assert(donethreads.count(tid) == 0 && 
-          "Finishing a thread that has already been finished");
+        // Note: Threads can be spawned, "finished", and respawned.
+        // If they are respawned, they will be re-added to the live threads
+        (void) livethreads.erase(tid);
         donethreads.insert(tid);
         UnLock();
     }
@@ -371,6 +373,7 @@ public:
             SetThreadData((*iit), tid, DataManagerType_Thread);
         }
         allthreads.insert(tid);
+        livethreads.insert(tid);
         UnLock(lock);
     }
 
