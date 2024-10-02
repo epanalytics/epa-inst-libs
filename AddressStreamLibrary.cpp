@@ -137,6 +137,8 @@ extern "C" {
     void* tool_thread_fini(thread_key_t tid){
         SAVE_STREAM_FLAGS(cout);
         inform << "Destroying thread " << hex << tid << ENDL;
+        if (Driver != NULL)
+            Driver->FinalizeThread(tid);
         RESTORE_STREAM_FLAGS(cout);
         return NULL;
     }

@@ -316,6 +316,10 @@ void* AddressStreamDriver::FinalizeImage(image_key_t* key) {
     return NULL;
 }
 
+void AddressStreamDriver::FinalizeThread(thread_key_t tid) {
+    allData->FinishThread(tid);
+}
+
 // Look for a file that has variable names and locations
 // This will get passed onto the data structure module
 void AddressStreamDriver::GetAndSetVariableNameFile() {
@@ -422,6 +426,18 @@ void* AddressStreamDriver::InitializeNewImage(image_key_t* iid,
 
     // Remove initialization instrumentation points for this image
     dynamicPoints->SetDynamicPoint(GENERATE_KEY(*iid, PointType_inits), false);
+
+    // TODO: Do we want to do this for every tool or just Ariel?
+    fprintf(stderr, "ACC: Do openmp in InitializeNewImage\n");
+    volatile int x = 0;
+    #pragma omp parallel
+    {
+        #pragma omp critical
+        {
+            x += 1;
+        }
+    }
+
     return NULL;
 }
 
@@ -516,8 +532,8 @@ void AddressStreamDriver::ProcessAllBuffers(ProcessBuffersExtra extra) {
     fastData->Lock();
     allData->WriteLock();
     sampler->WriteLock();
-    SuspendAllThreads(allData->CountThreads(false), 
-      allData->allthreads.begin(), allData->allthreads.end());
+    SuspendAllThreads(allData->livethreads.size(),
+      allData->livethreads.begin(), allData->livethreads.end());
 
     // Go through each image and thread and process their buffers
     for (set<image_key_t>::iterator iit = allData->allimages.begin();
@@ -1044,8 +1060,8 @@ void* AddressStreamDriver::ProcessThreadBuffer(image_key_t iid, thread_key_t
             // We are modifiying dynamic points. Use the sampler write 
             // lock to protect this action
             sampler->WriteLock();
-            SuspendAllThreads(allData->CountThreads(false), 
-              allData->allthreads.begin(), allData->allthreads.end());
+            SuspendAllThreads(allData->livethreads.size(),
+              allData->livethreads.begin(), allData->livethreads.end());
         }
         dynamicPoints->SetDynamicPoints(*liveMemoryAccessInstPointKeys,
           !(isSampling));
@@ -1303,8 +1319,8 @@ void AddressStreamDriver::ShutOffInstrumentationInBlocks(set<uint64_t>& blocks,
     if (suspend) {
         allData->ReadLock();
         sampler->WriteLock();
-        SuspendAllThreads(allData->CountThreads(false), 
-          allData->allthreads.begin(), allData->allthreads.end());
+        SuspendAllThreads(allData->livethreads.size(),
+          allData->livethreads.begin(), allData->livethreads.end());
     }
 
     uint64_t imageSequence = (uint32_t)allData->GetImageSequence(iid, false);
@@ -1350,8 +1366,8 @@ void AddressStreamDriver::ShutOffInstrumentationInMaxedGroups(image_key_t iid,
     if (suspend) {
         allData->ReadLock();
         sampler->WriteLock();
-        SuspendAllThreads(allData->CountThreads(false), 
-          allData->allthreads.begin(), allData->allthreads.end());
+        SuspendAllThreads(allData->livethreads.size(),
+          allData->livethreads.begin(), allData->livethreads.end());
     }
     
     for (set<uint64_t>::iterator it = liveMemoryAccessInstPointKeys->begin();

@@ -24,8 +24,6 @@
 #include <ArielFrontend.hpp>
 
 #include <iostream>
-#include <fstream>
-#include <sstream>
 #include <cstring>
 #include <cassert>
 
@@ -55,17 +53,19 @@ uint32_t ArielFrontendTool::CreateHandlers(uint32_t index, StringParser* parser)
         ErrorExit("Please set METASIM_SST_SHMEM", MetasimError_Env);
     }
 
-    ShmemName = (string)e;
-    handlers.push_back(new ArielFrontendHandler(ShmemName));
+    shmemName = (string)e;
+    tunnelCreator = new ArielFrontendHandler(shmemName);
+    tunnelCreator->InitializeTunnel();
+    handlers.push_back(tunnelCreator);
     return handlers.size();
 }
 
 void ArielFrontendTool::FinalizeTool(DataManager<AddressStreamStats*>* AllData,
   SamplingMethod* Sampler) {
-    
-    AddressStreamStats* stats = AllData->GetData(AllData->GetFirstImage(),
-      pthread_self());
 
+    // Currently only passing data from rank 0 // TODO --> Generalize
+    if (GetTaskId() == 0)
+        tunnelCreator->FinalizeTunnel();
 }
 
 ArielStats::ArielStats(uint32_t threadSeq) : threadId(threadSeq) {
@@ -78,28 +78,27 @@ bool ArielStats::Verify(){
     return true;
 }
 
-//SST::Core::Interprocess::SHMChild<ArielTunnel> * tunnelmgr;
-ArielFrontendHandler::ArielFrontendHandler(std::string n) : ShmemName(n) {
+// Type info: SST::Core::Interprocess::SHMChild<ArielTunnel> * tunnelmgr;
+ArielFrontendHandler::ArielFrontendHandler(std::string n) : shmemName(n) {
 }
+
 ArielFrontendHandler::~ArielFrontendHandler() {
-    if (tunnel != NULL) {
-        ArielCommand ac;
-        ac.command = ARIEL_PERFORM_EXIT;
-        ac.instPtr = (uint64_t) 0;
-        tunnel->writeMessage(0, ac);
-        
-        delete tunnel;
-    }
-    tunnel = NULL;
+    // tunnel deleted during FinalizeTool/FinalizeTunnel
+}
+
+void ArielFrontendHandler::FinalizeTunnel() {
+    ArielCommand ac;
+    ac.command = ARIEL_PERFORM_EXIT;
+    ac.instPtr = (uint64_t) 0;
+    tunnel->writeMessage(0, ac);
+    delete tunnel;
 }
 
 void ArielFrontendHandler::InitializeTunnel() {
     if (tunnel != NULL)
         return;
-
-    tunnelmgr = new SST::Core::Interprocess::SHMChild<ArielTunnel>(ShmemName);
+    tunnelmgr = new SST::Core::Interprocess::SHMChild<ArielTunnel>(shmemName);
     tunnel = tunnelmgr->getTunnel();
-
 }
 
 void ArielFrontendHandler::Print(ofstream& f){
@@ -116,8 +115,6 @@ uint32_t ArielFrontendHandler::Process(void* stats, uint64_t memSeq,
 
     if (GetTaskId() != 0)
         return 0;
-
-    InitializeTunnel();
 
     // Send Start instruction
     ac.command = ARIEL_START_INSTRUCTION;
@@ -170,8 +167,6 @@ void ArielFrontendHandler::ProcessInstructions(void* stats, uint64_t memSeq,
 
     if (GetTaskId() != 0)
         return;
-
-    InitializeTunnel();
 
     // Send NOOP instruction for each non memory instruction
     ac.command = ARIEL_NOOP;
