@@ -43,16 +43,20 @@ class ArielFrontendHandler;
 
 class ArielFrontendTool : public AddressStreamTool {
   protected:
-    std::string shmemName = "";
+    std::string shmemName;
+    uint32_t traceRank; // Ariel picks a rank to collect data from
     ArielFrontendHandler* tunnelCreator;
+    std::vector<ArielFrontendHandler*> tunnelUsers;
+    bool usesMPI;
   public:
-    ArielFrontendTool() : AddressStreamTool(), shmemName(""),
-      tunnelCreator(NULL) {}
+    ArielFrontendTool() : AddressStreamTool(), shmemName(""), traceRank(0),
+      tunnelCreator(NULL), usesMPI(false) {}
     virtual void AddNewHandlers(AddressStreamStats* stats);
     virtual void AddNewStreamStats(AddressStreamStats* stats);
     virtual uint32_t CreateHandlers(uint32_t index, StringParser* parser);
     virtual void FinalizeTool(DataManager<AddressStreamStats*>* AllData,
       SamplingMethod* Sampler);
+    virtual void NotifyDoneMPIInit();
 };
 
 class ArielStats : public StreamStats {
@@ -83,20 +87,23 @@ public:
 
 class ArielFrontendHandler : public MemoryStreamHandler {
 private:
+    std::string shmemName;
+    uint32_t traceRank; // Ariel picks a rank to collect data from
     SST::Core::Interprocess::SHMChild<SST::ArielComponent::ArielTunnel>*
       tunnelmgr;
     SST::ArielComponent::ArielTunnel* tunnel;
-    std::string shmemName;
 public:
     ArielFrontendHandler(std::string n);
     ~ArielFrontendHandler();
 
     void FinalizeTunnel();
     void InitializeTunnel();
+    void InitializeTunnel(ArielFrontendHandler& h);
     void Print(std::ofstream& f);
     uint32_t Process(void* stats, uint64_t memSeq, bool ldstFlag,
       uint64_t* addresses, uint64_t length, bool memvecFlag);
     void ProcessInstructions(void* stats, uint64_t memSeq, uint64_t numInsns);
+    void SetTraceRank(uint32_t r) { traceRank = r; }
     bool Verify() { return true; }
 };
 

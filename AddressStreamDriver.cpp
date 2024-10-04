@@ -510,6 +510,13 @@ void AddressStreamDriver::InitializeStatsWithNewStreamStats(AddressStreamStats*
     stats->AllocCount = originalAllocCount;
 }
 
+void AddressStreamDriver::NotifyDoneMPIInit() {
+    for (vector<AddressStreamTool*>::iterator it = tools->begin(); it !=
+      tools->end(); it++) {
+        (*it)->NotifyDoneMPIInit();
+    }
+}
+
 void AddressStreamDriver::PauseApplicationWrappers() {
     PAUSE_MODULE(dataStructureModule);
 }

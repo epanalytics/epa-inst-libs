@@ -46,6 +46,7 @@ class AddressStreamTool {
     virtual uint32_t CreateHandlers(uint32_t, StringParser*) = 0;
     virtual void FinalizeTool(DataManager<AddressStreamStats*>*, 
       SamplingMethod*) = 0;
+    virtual void NotifyDoneMPIInit() {}
 };
 
 class StreamStats {
