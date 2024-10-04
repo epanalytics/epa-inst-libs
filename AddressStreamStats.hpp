@@ -106,6 +106,7 @@ typedef struct BufferEntry_s {
     uint8_t         loadstoreflag;   // Dirty Caching
     uint64_t        imageid;         // Multi-image
     uint64_t        memseq;          // identifies memop in image
+    uint64_t        regularinsns;    // # non-memory insns before this memop
     union {
         uint64_t address;        // value simulated
         struct VectorAddress vectorAddress;

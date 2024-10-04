@@ -934,8 +934,10 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
 
             if (reference->type == INSN_COUNT) {
                 handler->ProcessInstructions((void*)ss, memSeq,
-                  reference->address);
+                  reference->regularinsns);
             } else {
+                handler->ProcessInstructions((void*)ss, memSeq,
+                  reference->regularinsns);
                 // maxNumAddresses is the allocated size of the array when it
                 // was created, the length is the number of actual elements used
                 (void) handler->Process((void*)ss, memSeq, ldstFlag,
