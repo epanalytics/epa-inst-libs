@@ -105,6 +105,7 @@ extern "C" {
 
     // Called after MPI_Init is called
     void* tool_mpi_init(){
+        Driver->NotifyDoneMPIInit();
         Driver->UnpauseApplicationWrappers();
         return NULL;
     }

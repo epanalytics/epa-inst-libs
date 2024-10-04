@@ -155,6 +155,8 @@ class AddressStreamDriver {
     bool IsCodeCentric() { return runCodeCentric; }
     bool IsDataCentric() { return runDataCentric; }
 
+    void NotifyDoneMPIInit();
+
     void PauseApplicationWrappers();
     void ProcessAllBuffers(ProcessBuffersExtra extra = 
       ProcessBuffersExtra_doNothing);
