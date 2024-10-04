@@ -23,6 +23,7 @@
 
 #include <vector>
 #include <string>
+// for CounterTypes
 #include <AddressStreamStats.hpp>
 
 template <class T> class DataManager;

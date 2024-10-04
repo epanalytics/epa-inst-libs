@@ -18,6 +18,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef SLIMSTATS
+
 #include <InstrumentationCommon.hpp>
 #include <DataManager.hpp>
 #include <Metasim.hpp>
@@ -67,7 +69,7 @@ void AddressRangeTool::FinalizeTool(DataManager<AddressStreamStats*>* AllData,
     uint64_t totalMemop = 0;
     // Calculate the number of access counts
     for (set<image_key_t>::iterator iit = AllData->allimages.begin();
-      iit != AllData->allimages.end(); iit++){
+      iit != AllData->allimages.end(); iit++) {
 
         for(DataManager<AddressStreamStats*>::iterator it =
           AllData->begin(*iit); it != AllData->end(*iit); ++it) {
@@ -321,3 +323,4 @@ uint32_t AddressRangeHandler::Process(void* stats, uint64_t memSeq,
     return 0;
 }
 
+#endif // #ifdef SLIMSTATS
