@@ -62,6 +62,15 @@ extern "C" {
 
     void epa_pebil_pause_() { epa_pebil_pause(); return; }
 
+    // The Ariel API has some defined user functions that we need to handle
+    // But only if we are building the Ariel Frontend
+#ifdef HAS_ARIEL_FRONTEND
+    void ariel_enable() { epa_pebil_start(); return; }
+    void ariel_enable_() { ariel_enable(); return; }
+    void ariel_disable() { epa_pebil_pause(); return; }
+    void ariel_disable_() { ariel_disable(); return; }
+#endif
+
     // Create mutex to esnure that dynamicPoints are initialized exactly once
     static pthread_rwlock_t dynamic_init_rwlock = PTHREAD_RWLOCK_INITIALIZER;
     // Called at just before image initialization
