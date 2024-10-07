@@ -427,8 +427,10 @@ void* AddressStreamDriver::InitializeNewImage(image_key_t* iid,
     // Remove initialization instrumentation points for this image
     dynamicPoints->SetDynamicPoint(GENERATE_KEY(*iid, PointType_inits), false);
 
-    // TODO: Do we want to do this for every tool or just Ariel?
-    fprintf(stderr, "ACC: Do openmp in InitializeNewImage\n");
+    // The Ariel frontend requires thread sequence numbers to be in order from
+    // 0 to (N-1). Run an openmp loop before MPI_Init so that we add user
+    // threads before MPI helper threads
+#ifdef HAS_ARIEL_FRONTEND
     volatile int x = 0;
     #pragma omp parallel
     {
@@ -437,6 +439,7 @@ void* AddressStreamDriver::InitializeNewImage(image_key_t* iid,
             x += 1;
         }
     }
+#endif
 
     return NULL;
 }
