@@ -144,6 +144,7 @@ AddressStreamDriver::AddressStreamDriver() {
 
     // Create a parser for parsing
     parser = new StringParser();
+    slicerPaused = false;
 
     variableNameFile = "";
 
@@ -388,6 +389,7 @@ void AddressStreamDriver::InitializeKeys() {
         sampler->WriteLock();
         //SetDynamicPoints(false);
         dynamicPoints->SetDynamicPoints(*liveMemoryAccessInstPointKeys, false);
+        slicerPaused = true;
         sampler->UnLock();
     }
 
@@ -557,8 +559,10 @@ void AddressStreamDriver::ProcessAllBuffers(ProcessBuffersExtra extra) {
     // Do we need to turn instrumentation on/off after processing?
     if (extra == ProcessBuffersExtra_setDynamicOn) {
         dynamicPoints->SetDynamicPoints(*liveMemoryAccessInstPointKeys, true);
+        slicerPaused = false;
     } else if (extra == ProcessBuffersExtra_setDynamicOff) {
         dynamicPoints->SetDynamicPoints(*liveMemoryAccessInstPointKeys, false);
+        slicerPaused = true;
     }
 
     // resume all threads
@@ -1026,9 +1030,13 @@ void* AddressStreamDriver::ProcessThreadBuffer(image_key_t iid, thread_key_t
       << "Capacity " << dec << capacity << TAB << "Total " << dec 
       << sampler->GetAccessCount() << ENDL);
 
-    // If there is no more instrumentation, return
-    // Thread-Safe call
-    if (!HasLiveInstrumentationPoints(lock)){
+    // If there is no more instrumentation (Thread-Safe call), return
+    // If the slicer has paused instrumentation, return
+    // Note -- slicer is not protected by a lock right now. We could take a hit
+    // to performance to do so, but if it *needs* to be protected by a lock,
+    // then I think the slicer is not being used correctly (it's a global
+    // slicer, so I don't know how slicing in a threaded region would work)
+    if (!HasLiveInstrumentationPoints(lock) || slicerPaused) {
         UnLockDSM(lock);
         DONE_WITH_BUFFER();
     }

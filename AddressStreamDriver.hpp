@@ -86,7 +86,8 @@ class AddressStreamDriver {
     FastData<AddressStreamStats*, BufferEntry*>* fastData = NULL;
     // set of instrumentation points that add addresses to the buffer
     std::set<uint64_t>* liveMemoryAccessInstPointKeys = NULL;  
-
+    bool slicerPaused;  // Keeps track of whether the instrumentation has been
+                        // turned off by the slicer
     StringParser* parser = NULL;
 
     std::string variableNameFile; // For data structure module
