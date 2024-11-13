@@ -626,7 +626,8 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
 #ifndef SLIMSTATS
                 inform << "found address 0 at memseq: " << std::dec <<
                    memSeq << ", skipping\n";
-#else
+#else 
+// We don't do memseq for memtrace, we do the raw insn address
                 inform << "found address 0 at insn: 0x" << std::hex <<
                    memSeq << ", skipping\n";
 #endif
