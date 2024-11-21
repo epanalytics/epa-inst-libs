@@ -623,7 +623,14 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                       reference->address, false);
 #endif
             } else {
-                inform << "found address 0, skipping\n";
+#ifndef SLIMSTATS
+                inform << "found address 0 at memseq: " << std::dec <<
+                   memSeq << ", skipping\n";
+#else 
+// We don't do memseq for memtrace, we do the raw insn address
+                inform << "found address 0 at insn: 0x" << std::hex <<
+                   memSeq << ", skipping\n";
+#endif
             }
         // end of if memory entry 
         } else if (reference->type == VECTOR_ENTRY ) {
