@@ -45,6 +45,7 @@ void ArielFrontendTool::AddNewStreamStats(AddressStreamStats* stats) {
     ((ArielStats*)(stats->Stats[indexInStats]))->SetIsDP(stats->IsDP);
     ((ArielStats*)(stats->Stats[indexInStats]))->SetIsFP(stats->IsFP);
     ((ArielStats*)(stats->Stats[indexInStats]))->SetSize(stats->SizeInBytes);
+    ((ArielStats*)(stats->Stats[indexInStats]))->SetInstPtr(stats->Addresses);
 }
 
 uint32_t ArielFrontendTool::CreateHandlers(uint32_t index, StringParser* parser) {
@@ -166,6 +167,8 @@ uint32_t ArielFrontendHandler::Process(void* stats, uint64_t memSeq,
     ArielStats* s = (ArielStats*)stats;
     ArielCommand ac;
 
+    static std::set<uint64_t> reportedMemSeqs;
+
     if (length <= 0)
         return 0;
 
@@ -187,8 +190,17 @@ uint32_t ArielFrontendHandler::Process(void* stats, uint64_t memSeq,
         else
             ac.inst.instClass = ARIEL_INST_SP_FP;
     }
+
+    auto myInstClass = ac.inst.instClass;
     ac.inst.simdElemCount = length;
     tunnel->writeMessage(s->GetThread(), ac);
+
+    //if (length > 1) {
+    //    if (ldstFlag)
+    //        fprintf(stderr, "ACC: Found a gather: %d with element size %d\n", memSeq, s->GetSize(memSeq));
+    //    else
+    //        fprintf(stderr, "ACC: Found a scatter: %d with element size %d\n", memSeq, s->GetSize(memSeq));
+    //}
 
     for(int i = 0; i < length; i++) {
         uint64_t addr = addresses[i];
@@ -204,14 +216,19 @@ uint32_t ArielFrontendHandler::Process(void* stats, uint64_t memSeq,
             ac.inst.addr = addr;
             ac.inst.size = s->GetSize(memSeq);
 
-            //if (ldstFlag)
-            //fprintf(stderr, "ACC: ARIEL_PERFORM_READ: %d, %#lx\n", ac.instPtr,
-            //  ac.inst.addr);
-            //else
-            //fprintf(stderr, "ACC: ARIEL_PERFORM_WRITE: %d, %#lx\n", ac.instPtr,
-            //  ac.inst.addr);
+           // if (ldstFlag)
+           //     fprintf(stderr, "ARIEL_PERFORM_READ: %#lx, %d, %#lx\n",
+           //       ac.instPtr, ac.inst.size, ac.inst.addr);
+           // else
+           //     fprintf(stderr, "ARIEL_PERFORM_WRITE: %#lx, %d, %#lx\n",
+           //       ac.instPtr, ac.inst.size, ac.inst.addr);
             tunnel->writeMessage(s->GetThread(), ac);
         }
+    }
+    if (reportedMemSeqs.count(memSeq) == 0) {
+        fprintf(stderr, "ACC_ARIEL: instPtr=%#lx instClass=%d simdElemCount=%d command=%d size=%d length=%d\n", s->GetInstPtr(memSeq), myInstClass, length, ac.command, ac.inst.size, length);
+        reportedMemSeqs.insert(memSeq);
+
     }
 
     ac.command = ARIEL_END_INSTRUCTION;

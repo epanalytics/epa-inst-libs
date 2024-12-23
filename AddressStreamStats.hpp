@@ -154,6 +154,7 @@ typedef struct AddressStreamStats_s {
     bool* IsDP;           // Is double-precision? False - single-precision
     bool* IsFP;           // Is floating-point ins (for Ariel)
     uint32_t* SizeInBytes;// Size of load or store in bytes
+    uint64_t* Addresses;
 
     // per-block data
     CounterTypes* Types; // If Counter is a count or index to a count
@@ -166,7 +167,7 @@ typedef struct AddressStreamStats_s {
     uint32_t* Lines;
     char** Functions;
     uint64_t* Hashes;
-    uint64_t* Addresses;
+    //uint64_t* Addresses;
     uint64_t* GroupIds;
     StreamStats** Stats; // indexed by handler
     MemoryStreamHandler** Handlers;

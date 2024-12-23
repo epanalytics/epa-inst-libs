@@ -65,6 +65,7 @@ private:
     bool* isDP;
     bool* isFP;
     uint32_t* sizeInBytes;
+    uint64_t* instPtr;
 
 public:
 
@@ -74,6 +75,7 @@ public:
     uint64_t GetAccessCount(uint32_t memid) { return 0; }
     uint32_t GetSize(uint32_t memid) { return sizeInBytes[memid]; }
     uint32_t GetThread() { return threadId; }
+    uint32_t GetInstPtr(uint32_t memid) { return instPtr[memid]; }
 
     bool IsDP(uint32_t memseq) { return isDP[memseq]; }
     bool IsFP(uint32_t memseq) { return isFP[memseq]; }
@@ -81,6 +83,7 @@ public:
     void SetIsDP(bool* newIsDP) { isDP = newIsDP; }
     void SetIsFP(bool* newIsFP) { isFP = newIsFP; }
     void SetSize(uint32_t* newSize) { sizeInBytes = newSize; }
+    void SetInstPtr(uint64_t* newPtr) { instPtr = newPtr; }
 
     bool Verify();
 };
