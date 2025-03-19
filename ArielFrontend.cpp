@@ -178,6 +178,7 @@ uint32_t ArielFrontendHandler::Process(void* stats, uint64_t memSeq,
     if (tunnel == NULL) {
         fprintf(stderr, "ERROR: Rank %d is attempting to process the buffer "
           "but no tunnel has been initialized\n", GetTaskId());
+        return 0;
     }
 
     // Send Start instruction
@@ -225,11 +226,11 @@ uint32_t ArielFrontendHandler::Process(void* stats, uint64_t memSeq,
             tunnel->writeMessage(s->GetThread(), ac);
         }
     }
-    if (reportedMemSeqs.count(memSeq) == 0) {
-        fprintf(stderr, "ACC_ARIEL: instPtr=%#lx instClass=%d simdElemCount=%d command=%d size=%d length=%d\n", s->GetInstPtr(memSeq), myInstClass, length, ac.command, ac.inst.size, length);
-        reportedMemSeqs.insert(memSeq);
+    //if (reportedMemSeqs.count(memSeq) == 0) {
+    //    fprintf(stderr, "ACC_ARIEL: instPtr=%#lx instClass=%d simdElemCount=%d command=%d size=%d length=%d\n", s->GetInstPtr(memSeq), myInstClass, length, ac.command, ac.inst.size, length);
+    //    reportedMemSeqs.insert(memSeq);
 
-    }
+    //}
 
     ac.command = ARIEL_END_INSTRUCTION;
     ac.instPtr = memSeq;
@@ -245,6 +246,13 @@ void ArielFrontendHandler::ProcessInstructions(void* stats, uint64_t memSeq,
 
     if (GetTaskId() != traceRank)
         return;
+
+
+    if (tunnel == NULL) {
+        fprintf(stderr, "ERROR: Rank %d is attempting to process the buffer "
+          "but no tunnel has been initialized\n", GetTaskId());
+        return;
+    }
 
     // Send NOOP instruction for each non memory instruction
     ac.command = ARIEL_NOOP;
