@@ -77,9 +77,11 @@ using namespace std;
 #endif
 
 #ifdef HAS_EPA_TOOLS
+  #define GENERATE_ENTROPY_TOOL new EntropyRangeTool()
   #define GENERATE_PREFETCH_TOOL new PrefetchSimulationTool()
   #define GENERATE_SPATIAL_MEMOP_TOOL new SpatialLocalityPerMemOpTool()
 #else
+  #define GENERATE_ENTROPY_TOOL 0
   #define GENERATE_PREFETCH_TOOL 0
   #define GENERATE_SPATIAL_MEMOP_TOOL 0
 #endif
@@ -1206,7 +1208,13 @@ void AddressStreamDriver::SetUpTools() {
     }
 
     if (runEntropyRange && runCodeCentric) {
-        tools->push_back(new EntropyRangeTool());
+        if (BuiltWithEPATools()) {
+            tools->push_back(GENERATE_ENTROPY_TOOL);
+        } else {
+            DISPLAY_ERROR << "No entropy range library linked. "
+              << "Unset entropy range library tool. Exitting." << ENDL;
+            exit(0);
+        }
     }
 
     if (runHardwarePrefetching) {
