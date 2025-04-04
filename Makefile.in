@@ -24,7 +24,7 @@ PEBIL_PAPI_BUILD = @PEBIL_PAPI_BUILD@
 PEBIL_PAPI_PATH = @PEBIL_PAPI_PATH@
 SST_AVAILABLE = @SST_AVAILABLE@
 
-PEBIL_LIBS = libpebilruntime.so libtimer.so libcounter.so libaddressstream.so libpebilslicer.so
+PEBIL_LIBS = libpebilruntime.so libtimer.so libcounter.so libaddressstream.so libaddressstream_omp.so libpebilslicer.so
 ifeq ($(PEBIL_PAPI_BUILD),yes)
 	PEBIL_LIBS += libpapifunc.so
 endif
@@ -55,7 +55,7 @@ endif
 COMMON_OBJS = $(LIBDIR)/InstrumentationCommon.o
 SHARED_COMMON_OBJS = $(LIBDIR)/InstrumentationCommon.O $(LIBDIR)/ThreadedCommon.O $(LIBDIR)/DynamicInstrumentation.O
 
-ASL_OBJS = $(LIBDIR)/AddressStreamBase.O $(LIBDIR)/AddressRange.O $(LIBDIR)/CacheSimulation.O $(LIBDIR)/ReuseDistanceASI.O $(LIBDIR)/ScatterGatherLength.O $(LIBDIR)/SpatialLocality.O $(LIBDIR)/AddressStreamDriver.O
+ASL_OBJS = $(LIBDIR)/AddressStreamBase.O $(LIBDIR)/AddressRange.O $(LIBDIR)/CacheSimulation.O $(LIBDIR)/ReuseDistanceASI.O $(LIBDIR)/ScatterGatherLength.O $(LIBDIR)/SpatialLocality.O
 
 ifeq ($(SST_AVAILABLE),yes)
 	EXTRA_INC += @SST_INCLUDES@
@@ -83,6 +83,9 @@ ifeq ($(EPA_TOOLS_AVAILABLE),yes)
   endif
 endif
 
+ASL_OMP_OBJS = $(ASL_OBJS) $(LIBDIR)/AddressStreamDriver_omp.O
+ASL_NOOMP_OBJS = $(ASL_OBJS) $(LIBDIR)/AddressStreamDriver.O
+
 # opempi does not automatically link fortran mpi
 ifeq ($(MPICC), mpicc)
   MPITYPE := "$(shell mpirun --version 2>&1 | grep "Open MPI")"
@@ -98,6 +101,8 @@ $(LIBDIR)/%.o: %.c
 	$(MPICC) $(CFLAGS) $(EXTRA_FLAGS) $(EXTRA_DEF) $(EXTRA_INC) -c -o $@ $< $(SHARED_OPT)
 $(LIBDIR)/%.O: %.cpp
 	$(MPICXX) $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_DEF) $(EXTRA_INC) -c -o $@ $< $(SHARED_OPT)
+$(LIBDIR)/%_omp.O: %.cpp
+	$(MPICXX) $(CXXFLAGS) -DHAS_OPENMP -fopenmp $(EXTRA_FLAGS) $(EXTRA_DEF) $(EXTRA_INC) -c -o $@ $< $(SHARED_OPT)
 
 $(LIBDIR)/libpebilruntime.so : $(SHARED_COMMON_OBJS)
 	$(MPICXX) $(SHARED_LIB) -o $@ $^ $(EXTRA_LIBS) $(CXXFLAGS)
@@ -110,8 +115,11 @@ $(LIBDIR)/libcounter.so : $(LIBDIR)/CounterFunctions.O $(SHARED_COMMON_OBJS)
 $(LIBDIR)/libcounter.a : $(LIBDIR)/CounterFunctions.o $(COMMON_OBJS)
 	$(AR) $@ $(LIBDIR)/CounterFunctions.o $(COMMON_OBJS)
 
-$(LIBDIR)/libaddressstream.so : $(LIBDIR)/AddressStreamLibrary.O $(ASL_OBJS) $(SHARED_COMMON_OBJS)
+$(LIBDIR)/libaddressstream.so : $(LIBDIR)/AddressStreamLibrary.O $(ASL_NOOMP_OBJS) $(SHARED_COMMON_OBJS)
 	$(MPICXX) $(SHARED_LIB) -o $@ $^ $(EXTRA_LIBS) $(ASL_LIBS) $(REUSE_LIBS) $(CXXFLAGS)
+
+$(LIBDIR)/libaddressstream_omp.so : $(LIBDIR)/AddressStreamLibrary.O $(ASL_OMP_OBJS) $(SHARED_COMMON_OBJS)
+	$(MPICXX) $(SHARED_LIB) -o $@ $^ -DHAS_OPENMP -fopenmp $(EXTRA_LIBS) $(ASL_LIBS) $(REUSE_LIBS) $(CXXFLAGS)
 
 $(LIBDIR)/libfrequencyconfig.so : $(LIBDIR)/FrequencyConfig.O
 	$(MPICXX) $(SHARED_LIB) -o $@ $^ $(EXTRA_LIBS) $(CXXFLAGS)

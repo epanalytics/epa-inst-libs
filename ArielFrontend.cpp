@@ -30,6 +30,9 @@
 #include <sst/core/interprocess/shmchild.h>
 #include "ariel_shmem.h"
 
+// Uncomment this if you want to run the Ariel Frontend Tool without SST
+//#define ARIEL_DEBUG_MODE 1
+
 using namespace SST::ArielComponent;
 using namespace std;
 
@@ -50,11 +53,13 @@ void ArielFrontendTool::AddNewStreamStats(AddressStreamStats* stats) {
 
 uint32_t ArielFrontendTool::CreateHandlers(uint32_t index, StringParser* parser) {
     indexInStats = index;
+#ifndef ARIEL_DEBUG_MODE
     char* e = parser->GetEnv("METASIM_SST_SHMEM");
     if (e == NULL) {
         ErrorExit("Please set METASIM_SST_SHMEM", MetasimError_Env);
     }
     shmemName = (string)e;
+#endif
 
     uint32_t mpiUsage;
     if (parser->ReadEnvUint32("METASIM_SST_USE_MPI", &mpiUsage))
@@ -133,7 +138,9 @@ void ArielFrontendHandler::FinalizeTunnel() {
     ArielCommand ac;
     ac.command = ARIEL_PERFORM_EXIT;
     ac.instPtr = (uint64_t) 0;
+#ifndef ARIEL_DEBUG_MODE
     tunnel->writeMessage(0, ac);
+#endif
     delete tunnelmgr;
 }
 
@@ -142,20 +149,25 @@ void ArielFrontendHandler::FinalizeTunnel() {
 void ArielFrontendHandler::InitializeTunnel() {
     if (tunnel != NULL)
         return;
+#ifndef ARIEL_DEBUG_MODE
     tunnelmgr = new SST::Core::Interprocess::SHMChild<ArielTunnel>(shmemName);
     tunnel = tunnelmgr->getTunnel();
+#endif
+    //sleep(1);
 }
 
 // Give a handler access to an already-created Ariel tunnel
 void ArielFrontendHandler::InitializeTunnel(ArielFrontendHandler& h) {
     if (tunnel != NULL)
         return;
+#ifndef ARIEL_DEBUG_MODE
     if (h.tunnel == NULL) {
         ErrorExit("Attempting to initialize a tunnel user but the creator has "
           "not created a tunnel", MetasimError_None);
     }
 
     tunnel = h.tunnel;
+#endif
 }
 
 void ArielFrontendHandler::Print(ofstream& f){
@@ -175,11 +187,13 @@ uint32_t ArielFrontendHandler::Process(void* stats, uint64_t memSeq,
     if (GetTaskId() != traceRank)
         return 0;
 
+#ifndef ARIEL_DEBUG_MODE
     if (tunnel == NULL) {
         fprintf(stderr, "ERROR: Rank %d is attempting to process the buffer "
           "but no tunnel has been initialized\n", GetTaskId());
         return 0;
     }
+#endif
 
     // Send Start instruction
     ac.command = ARIEL_START_INSTRUCTION;
@@ -194,7 +208,9 @@ uint32_t ArielFrontendHandler::Process(void* stats, uint64_t memSeq,
 
     auto myInstClass = ac.inst.instClass;
     ac.inst.simdElemCount = length;
+#ifndef ARIEL_DEBUG_MODE
     tunnel->writeMessage(s->GetThread(), ac);
+#endif
 
     //if (length > 1) {
     //    if (ldstFlag)
@@ -217,13 +233,15 @@ uint32_t ArielFrontendHandler::Process(void* stats, uint64_t memSeq,
             ac.inst.addr = addr;
             ac.inst.size = s->GetSize(memSeq);
 
-           // if (ldstFlag)
-           //     fprintf(stderr, "ARIEL_PERFORM_READ: %#lx, %d, %#lx\n",
-           //       ac.instPtr, ac.inst.size, ac.inst.addr);
-           // else
-           //     fprintf(stderr, "ARIEL_PERFORM_WRITE: %#lx, %d, %#lx\n",
-           //       ac.instPtr, ac.inst.size, ac.inst.addr);
+            //if (ldstFlag)
+            //    fprintf(stderr, "ARIEL_PERFORM_READ: %#lx, %d, %#lx\n",
+            //      ac.instPtr, ac.inst.size, ac.inst.addr);
+            //else
+            //    fprintf(stderr, "ARIEL_PERFORM_WRITE: %#lx, %d, %#lx\n",
+            //      ac.instPtr, ac.inst.size, ac.inst.addr);
+#ifndef ARIEL_DEBUG_MODE
             tunnel->writeMessage(s->GetThread(), ac);
+#endif
         }
     }
     //if (reportedMemSeqs.count(memSeq) == 0) {
@@ -234,7 +252,9 @@ uint32_t ArielFrontendHandler::Process(void* stats, uint64_t memSeq,
 
     ac.command = ARIEL_END_INSTRUCTION;
     ac.instPtr = memSeq;
+#ifndef ARIEL_DEBUG_MODE
     tunnel->writeMessage(s->GetThread(), ac);
+#endif
     return 0;
 
 }
@@ -248,15 +268,19 @@ void ArielFrontendHandler::ProcessInstructions(void* stats, uint64_t memSeq,
         return;
 
 
+#ifndef ARIEL_DEBUG_MODE
     if (tunnel == NULL) {
         fprintf(stderr, "ERROR: Rank %d is attempting to process the buffer "
           "but no tunnel has been initialized\n", GetTaskId());
         return;
     }
+#endif
 
     // Send NOOP instruction for each non memory instruction
     ac.command = ARIEL_NOOP;
     ac.instPtr = memSeq;
+#ifndef ARIEL_DEBUG_MODE
     for (auto i = 0; i < numInsns; i++)
         tunnel->writeMessage(s->GetThread(), ac);
+#endif
 }

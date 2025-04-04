@@ -51,6 +51,10 @@
 #include <DataStructureModule.hpp>
 #endif
 
+#ifdef HAS_OPENMP
+#include <omp.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -431,6 +435,7 @@ void* AddressStreamDriver::InitializeNewImage(image_key_t* iid,
     // Remove initialization instrumentation points for this image
     dynamicPoints->SetDynamicPoint(GENERATE_KEY(*iid, PointType_inits), false);
 
+#ifdef HAS_OPENMP
     // The Ariel frontend requires thread sequence numbers to be in order from
     // 0 to (N-1). Run an openmp loop before MPI_Init so that we add user
     // threads before MPI helper threads
@@ -443,6 +448,7 @@ void* AddressStreamDriver::InitializeNewImage(image_key_t* iid,
             x += 1;
         }
     }
+#endif
 #endif
 
     return NULL;
