@@ -20,6 +20,8 @@
 
 #include <InstrumentationCommon.hpp>
 #include <Metasim.hpp>
+// for pebil_map_type
+#include <InstrumentationCommon.hpp>
 #include <AddressStreamBase.hpp>
 
 #include <iostream>

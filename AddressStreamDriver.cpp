@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is part of the pebil project.
  * 
  * Copyright (c) 2010, University of California Regents
@@ -26,6 +26,11 @@
 #include <AddressStreamBase.hpp>
 #include <AddressStreamDriver.hpp>
 
+#ifdef SLIMSTATS
+#include <MemTrace.hpp>
+#endif
+
+#ifndef SLIMSTATS
 #include <AddressRange.hpp>
 #include <CacheSimulation.hpp>
 #include <ReuseDistanceASI.hpp>
@@ -46,6 +51,7 @@
 #include <PrefetchSimulation.hpp>
 #include <SpatialLocalityPerMemOp.hpp>
 #endif
+#endif // SLIMSTATS
 
 #ifdef HAS_DATA_STRUCTURE_MODULE
 #include <DataStructureModule.hpp>
@@ -73,21 +79,23 @@
 
 using namespace std;
 
-// Define directives to keep #ifdefs out of code
-#ifdef HAS_ARIEL_FRONTEND
-  #define GENERATE_ARIEL_TOOL new ArielFrontendTool()
-#else
-  #define GENERATE_ARIEL_TOOL 0
-#endif
+#ifndef SLIMSTATS
+    // Define directives to keep #ifdefs out of code
+    #ifdef HAS_ARIEL_FRONTEND
+      #define GENERATE_ARIEL_TOOL new ArielFrontendTool()
+    #else
+      #define GENERATE_ARIEL_TOOL 0
+    #endif
 
-#ifdef HAS_EPA_TOOLS
-  #define GENERATE_ENTROPY_TOOL new EntropyRangeTool()
-  #define GENERATE_PREFETCH_TOOL new PrefetchSimulationTool()
-  #define GENERATE_SPATIAL_MEMOP_TOOL new SpatialLocalityPerMemOpTool()
-#else
-  #define GENERATE_ENTROPY_TOOL 0
-  #define GENERATE_PREFETCH_TOOL 0
-  #define GENERATE_SPATIAL_MEMOP_TOOL 0
+    #ifdef HAS_EPA_TOOLS
+      #define GENERATE_ENTROPY_TOOL new EntropyRangeTool()
+      #define GENERATE_PREFETCH_TOOL new PrefetchSimulationTool()
+      #define GENERATE_SPATIAL_MEMOP_TOOL new SpatialLocalityPerMemOpTool()
+    #else
+      #define GENERATE_ENTROPY_TOOL 0
+      #define GENERATE_PREFETCH_TOOL 0
+      #define GENERATE_SPATIAL_MEMOP_TOOL 0
+    #endif
 #endif
 
 #ifdef HAS_DATA_STRUCTURE_MODULE
@@ -297,10 +305,11 @@ void* AddressStreamDriver::FinalizeImage(image_key_t* key) {
         ProcessThreadBuffer(iid, (*it));
     }
 
-    AddressStreamStats* statss = allData->GetData(iid, pthread_self());
+#ifndef SLIMSTATS
     string fileName = "";
-    fileName.append(statss->Application);
+    fileName.append(stats->Application);
     PRINT_DATA_STRUCTURE_REPORT(dataStructureModule, fileName);
+#endif
     
     // Create the reports 
     for (vector<AddressStreamTool*>::iterator it = tools->begin(); it !=
@@ -316,9 +325,16 @@ void* AddressStreamDriver::FinalizeImage(image_key_t* key) {
     inform << "CXXX Total Execution time for instrumented application " 
       << t << ENDL;
     // TODO Is this right?
+#ifndef SLIMSTATS
     double m = (double)(GetNumMemoryHandlers() * sampler->GetAccessCount());
     inform << "CXXX - Address Stream Library - Memops simulated per "
       << "second: " << (m/t) << ENDL;
+#else
+    double m = (double)(stats->Phase);
+    inform << "CXXX - Address Stream Library - Memops simulated per "
+      << "second: " << (m/t) << ENDL;
+#endif
+
     RESTORE_STREAM_FLAGS(cout);
     return NULL;
 }
@@ -344,9 +360,11 @@ void AddressStreamDriver::InitializeAddressStreamDriver(
     // Initialize AllData
     allData = d;
 
+
     // Initialize Sampler
     CreateSamplingMethod();
 
+#ifndef SLIMSTATS
     // Set up the tools!
     SetUpTools();
 
@@ -356,6 +374,9 @@ void AddressStreamDriver::InitializeAddressStreamDriver(
         GetAndSetVariableNameFile();
         SetUpDataStructureModule();
     }
+#else
+    SetUpMemTraceTool();
+#endif
 
 }
 
@@ -380,7 +401,7 @@ void AddressStreamDriver::InitializeKeys() {
     }
     sampler->UnLock();
 
-  
+#ifndef SLIMSTATS
     // Disable them if sampling is turned off
     if (sampler->GetSamplingFrequency() == 0){
         inform << "Disabling all simulation-related instrumentation"
@@ -398,13 +419,13 @@ void AddressStreamDriver::InitializeKeys() {
         slicerPaused = true;
         sampler->UnLock();
     }
-
+#endif
 }
 
 // Meant to only be called once per image (thus only one thread should 
 // ever call this)
 void* AddressStreamDriver::InitializeNewImage(image_key_t* iid, 
-  AddressStreamStats* stats, ThreadData* threadData){
+  AddressStreamStats* stats, ThreadData* threadData) {
 
     // If already added, just return
     if (allData->allimages.count(*iid) != 0) {
@@ -456,7 +477,9 @@ void* AddressStreamDriver::InitializeNewImage(image_key_t* iid,
 
 void* AddressStreamDriver::InitializeNewThread(thread_key_t tid){
     RegisterThreadInDynamicTool();
+#ifndef SLIMSTATS
     bool entered = EnterTool();
+#endif
     SAVE_STREAM_FLAGS(cout);
     if (allData){
         if(dynamicPoints->IsThreadedMode()) {
@@ -476,14 +499,22 @@ void* AddressStreamDriver::InitializeNewThread(thread_key_t tid){
     }
 
     RESTORE_STREAM_FLAGS(cout);
+#ifndef SLIMSTATS
     ExitTool(entered);
+#endif
     return NULL;
 }
 
 // Not thread-safe: a write lock must be held before using
 void AddressStreamDriver::InitializeStatsWithNewHandlers(AddressStreamStats* 
   stats) {
+
+#ifndef SLIMSTATS
     assert(GetNumMemoryHandlers() > 0);
+#else
+    assert(GetNumMemoryHandlers() == 1);
+#endif
+
     stats->Handlers = new MemoryStreamHandler*[GetNumMemoryHandlers()];
     bzero(stats->Handlers, sizeof(MemoryStreamHandler*) * 
       GetNumMemoryHandlers());
@@ -495,6 +526,7 @@ void AddressStreamDriver::InitializeStatsWithNewHandlers(AddressStreamStats*
     }
 }
 
+#ifndef SLIMSTATS
 // Not thread-safe: a write lock must be held before using
 void AddressStreamDriver::InitializeStatsWithNewStreamStats(AddressStreamStats*
   stats) {
@@ -522,6 +554,7 @@ void AddressStreamDriver::InitializeStatsWithNewStreamStats(AddressStreamStats*
     // Reset AllocCount
     stats->AllocCount = originalAllocCount;
 }
+#endif
 
 void AddressStreamDriver::NotifyDoneMPIInit() {
     for (vector<AddressStreamTool*>::iterator it = tools->begin(); it !=
@@ -545,7 +578,9 @@ void AddressStreamDriver::PauseApplicationWrappers() {
 void AddressStreamDriver::ProcessAllBuffers(ProcessBuffersExtra extra) {
 
     //Suspend all threads
+#ifndef SLIMSTATS
     bool entered = EnterTool();
+#endif
     // Get Data Structure Module FIRST, since process_buffer will 
     // take it first too
     WriteLockDSM();
@@ -579,7 +614,9 @@ void AddressStreamDriver::ProcessAllBuffers(ProcessBuffersExtra extra) {
     allData->UnLock();
     fastData->UnLock();
     UnLockDSM();
+#ifndef SLIMSTATS
     ExitTool(entered);
+#endif
 }
 
 //void AddressStreamDriver::ProcessAllBuffers() {
@@ -628,17 +665,28 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
         uint64_t memSeq = reference->memseq;
         uint64_t dataCentricSeq = reference->memseq;
         bool ldstFlag = reference->loadstoreflag;
+        // for memTrace
+        uint8_t swprefetchflag = reference->swprefetchflag;
         bool memvecFlag = false; 
         // for single memory entry, length is one
         uint64_t length = 1;
         if (reference->type == MEM_ENTRY) {
             if (reference->address != 0) { 
                 stats->addressesForProcessing[0] = reference->address;
+#ifndef SLIMSTATS
                 if (runDataCentric)
                     dataCentricSeq = GET_DATA_STRUCTURE_ID(dataStructureModule, 
                       reference->address, false);
+#endif
             } else {
-                inform << "found address 0, skipping\n";
+#ifndef SLIMSTATS
+                inform << "found address 0 at memseq: " << std::dec <<
+                   memSeq << ", skipping\n";
+#else 
+// We don't do memseq for memtrace, we do the raw insn address
+                inform << "found address 0 at insn: 0x" << std::hex <<
+                   memSeq << ", skipping\n";
+#endif
             }
         // end of if memory entry 
         } else if (reference->type == VECTOR_ENTRY ) {
@@ -666,6 +714,7 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                 mask = (mask >> 1);
             }// for num of indices
 
+#ifndef SLIMSTATS
             if (runDataCentric) {
                 dataCentricSeq = GET_DATA_STRUCTURE_ID(dataStructureModule, 
                   stats->addressesForProcessing[0], false);
@@ -682,6 +731,7 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                     }
                 }
             }
+#endif
         // If EPAX_VECTOR_ENTRY: a masked contiguous vector memop
         // Currently either takes the form of
         // ld1d z1.d, p0/z, [x0, x1, LSL #3] or  (scalar plus scalar)
@@ -744,6 +794,7 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
             } // For each memory address accessed
             memvecFlag = false;
 
+#ifndef SLIMSTATS
             if (runDataCentric) {
                 dataCentricSeq = GET_DATA_STRUCTURE_ID(dataStructureModule, 
                   stats->addressesForProcessing[0], false);
@@ -760,6 +811,7 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                     }
                 }
             }
+#endif
         // If EPAX_INDIRECT_ENTRY: a masked indirect vector memop (i.e.,
         // scatter and gathers)
         // Currently either takes the form of
@@ -910,6 +962,7 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
             
             memvecFlag = true;
 
+#ifndef SLIMSTATS
             if (runDataCentric) {
                 dataCentricSeq = GET_DATA_STRUCTURE_ID(dataStructureModule, 
                   stats->addressesForProcessing[0], false);
@@ -926,11 +979,13 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                     }
                 }
             }
+#endif
 #endif // EPAX_INST_TOOL
         } // end of epax indirect address
 
         debug(assert(length <= maxNumAddresses));
 
+#ifndef SLIMSTATS
         // Process for each memory handler
         for (uint32_t handlerIndex = 0; handlerIndex < GetNumMemoryHandlers(); 
           handlerIndex++) {
@@ -959,6 +1014,19 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                   stats->addressesForProcessing, length, memvecFlag);
             }
         }// for number of handlers
+#else
+        // stats holds a pointer to size (up and down converted)
+        // memSeq is the insnAddress, 
+        // ldstFlag, addressesForProcessing, and lenght remains unchanged
+        // swprefetchFlag is unused
+        uint64_t temp = (uint64_t) swprefetchflag;
+        MemoryStreamHandler* handler = stats->Handlers[0];
+        (void) handler->Process(&swprefetchflag, memSeq, ldstFlag,
+          stats->addressesForProcessing, length, swprefetchflag);
+
+        // for keeping track of total memops.
+        stats->Phase += length;
+#endif
 
         // 0 out addresses array to prevent passing stale data
         memset(stats->addressesForProcessing, 0, sizeof(uint64_t) *
@@ -989,6 +1057,7 @@ void* AddressStreamDriver::ProcessThreadBuffer(image_key_t iid, thread_key_t
 
 #define DONE_WITH_BUFFER(...) BUFFER_CURRENT(stats) = 0;  return NULL;
 
+#ifndef SLIMSTATS
     // Prevent another thread from executing this code for this thread's 
     // buffer at the same time as this thread. This currently can only 
     // happen during a data-centric, coming from ProcessAllBuffers.
@@ -1001,8 +1070,8 @@ void* AddressStreamDriver::ProcessThreadBuffer(image_key_t iid, thread_key_t
 
     // Check if we are sampling
     // Thread-safe: Sampling method protected with lock
-    bool isSampling;
-    isSampling = sampler->CurrentlySampling(lock);
+    bool isSampling = sampler->CurrentlySampling(lock);
+#endif
 
     assert(iid);
     if (allData == NULL){
@@ -1030,9 +1099,7 @@ void* AddressStreamDriver::ProcessThreadBuffer(image_key_t iid, thread_key_t
     uint64_t numElements = BUFFER_CURRENT(stats);
     uint64_t capacity = BUFFER_CAPACITY(stats);
 
-    // Thread-safe call
-    uint32_t threadSeq = allData->GetThreadSequence(tid, lock);
-
+#ifndef SLIMSTATS
     debug(inform << "Thread " << hex << tid << TAB << "Image " << hex 
       << iid << TAB << "Counter " << dec << numElements << TAB 
       << "Capacity " << dec << capacity << TAB << "Total " << dec 
@@ -1098,7 +1165,7 @@ void* AddressStreamDriver::ProcessThreadBuffer(image_key_t iid, thread_key_t
             sampler->UnLock();
             allData->UnLock();
         }
-    }
+    } // if sampler switches mode
 
     // Thread-safe
     sampler->IncrementAccessCount(numElements, lock);
@@ -1109,6 +1176,30 @@ void* AddressStreamDriver::ProcessThreadBuffer(image_key_t iid, thread_key_t
 
     UnLockDSM(lock);
     DONE_WITH_BUFFER();
+#else
+    debug(inform << "Thread " << hex << tid << TAB << "Image " << hex 
+      << iid << TAB << "Counter " << dec << numElements << TAB 
+      << "Capacity " << dec << capacity << TAB << "Total " << dec 
+      << stats->Phase << ENDL);
+
+    // If there is no more instrumentation, return
+    // Thread-Safe call
+    if (!HasLiveInstrumentationPoints()){
+        DONE_WITH_BUFFER();
+    }
+
+    // Refresh FastStats so it can be used
+    // Thread-safe call
+    BufferEntry* buffer = &(stats->Buffer[1]);
+    fastData->Refresh(buffer, numElements, tid, true);
+
+    // Process the buffer for the memory handler
+    // Thread-safe call 
+    (void) ProcessBufferForEachHandler(iid, tid, numElements, lock);
+
+    DONE_WITH_BUFFER();
+#endif
+    return NULL;
 }
 
 void AddressStreamDriver::ReadLockDSM(bool lock) {
@@ -1135,6 +1226,7 @@ void AddressStreamDriver::SetUpDataStructureModule() {
 #endif
 }
 
+#ifndef SLIMSTATS 
 void AddressStreamDriver::SetUpTools() {
     // Check for which tools to use
     uint32_t doAddressRange;
@@ -1298,6 +1390,17 @@ void AddressStreamDriver::SetUpTools() {
         toolIndex++;
     }
 }
+#endif
+
+#ifdef SLIMSTATS
+void AddressStreamDriver::SetUpMemTraceTool() {
+    AddressStreamTool* memTraceTool = new MemTraceTool();
+    tools->push_back(memTraceTool);
+    numMemoryHandlers = 1;
+    numCodeCentricTools = tools->size();
+    memTraceTool->CreateHandlers(0, parser);
+}
+#endif
 
 void AddressStreamDriver::ShutOffInstrumentationInAllBlocks() {
     // map of imageSequences -> set of blocks to shut off
@@ -1372,6 +1475,7 @@ void AddressStreamDriver::ShutOffInstrumentationInBlocks(set<uint64_t>& blocks,
     }
 }
 
+#ifndef SLIMSTATS
 void AddressStreamDriver::ShutOffInstrumentationInMaxedGroups(image_key_t iid, 
   thread_key_t tid, bool suspend) {
 
@@ -1429,6 +1533,7 @@ void AddressStreamDriver::ShutOffInstrumentationInMaxedGroups(image_key_t iid,
         allData->UnLock();
     }
 }
+#endif
 
 void AddressStreamDriver::UnpauseApplicationWrappers() {
     UNPAUSE_MODULE(dataStructureModule);

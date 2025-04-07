@@ -55,7 +55,6 @@ typedef enum {
 // Class to hold important variables and functions together
 class AddressStreamDriver {
   private:
-  
     // Are we running these tools?
     bool runAddressRange;
     bool runArielFrontend;
@@ -141,7 +140,9 @@ class AddressStreamDriver {
       ThreadData* threadData);
     void* InitializeNewThread(thread_key_t tid);
     virtual void InitializeStatsWithNewHandlers(AddressStreamStats* stats);
+#ifndef SLIMSTATS
     virtual void InitializeStatsWithNewStreamStats(AddressStreamStats* stats);
+#endif
 
     bool IsAddressRange() { return runAddressRange; }
     bool IsArielFrontend() { return runArielFrontend; }
@@ -172,7 +173,11 @@ class AddressStreamDriver {
     //void SetDynamicPoints(bool on);
 
     virtual void SetUpDataStructureModule();
+#ifndef SLIMSTATS
     virtual void SetUpTools();
+#else
+    virtual void SetUpMemTraceTool();
+#endif
 
     void ShutOffInstrumentationInAllBlocks();
     void ShutOffInstrumentationInBlock(uint64_t blockID, uint64_t imageSeq);

@@ -18,6 +18,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef SLIMSTATS
+
 #include <InstrumentationCommon.hpp>
 #include <DataManager.hpp>
 #include <DynamicInstrumentation.hpp>
@@ -373,3 +375,4 @@ uint32_t VectorLengthHandler::Process(void* stats, uint64_t memSeq,
    }*/
 }
                 
+#endif

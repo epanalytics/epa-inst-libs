@@ -20,6 +20,7 @@
 
 #ifndef _ReuseDistanceASI_hpp_
 #define _ReuseDistanceASI_hpp_
+#ifndef SLIMSTATS
 
 #include <AddressStreamBase.hpp> 
 #include <string>
@@ -77,4 +78,5 @@ class ReuseDistanceHandler : public MemoryStreamHandler {
     // END Testing functions
 };
 
+#endif // SLIMSTATS
 #endif /* _ReuseDistanceASI_hpp_ */
