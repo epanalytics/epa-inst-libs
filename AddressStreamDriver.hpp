@@ -61,6 +61,7 @@ class AddressStreamDriver {
     bool runCacheSimulation;
     bool runEntropyRange;
     bool runHardwarePrefetching;
+    bool runMemoryLogger;
     bool runReuseDistance;
     bool runScatterLength;
     bool runSpatialLocality;
