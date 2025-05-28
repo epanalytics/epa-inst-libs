@@ -40,7 +40,7 @@ void AddressRangeTool::AddNewHandlers(AddressStreamStats* stats) {
 }
 
 void AddressRangeTool::AddNewStreamStats(AddressStreamStats* stats) {
-    stats->Stats[indexInStats] = new RangeStats(stats->AllocCount);
+    stats->Stats[indexInStats] = new RangeStats(stats->MemopCount);
 }
 
 uint32_t AddressRangeTool::CreateHandlers(uint32_t index, StringParser* parser) {
@@ -159,9 +159,9 @@ void AddressRangeTool::FinalizeTool(DataManager<AddressStreamStats*>* AllData,
             // Stats are collected by memid. We need to present them by
             // block. Even if perinsn, just create new RangeStats data
             // structure and compile per-memid data into it
-            aggRange = new RangeStats(st->AllocCount);
+            aggRange = new RangeStats(st->BlockCount);
 
-            for (uint32_t memid = 0; memid < st->AllocCount; memid++){
+            for (uint32_t memid = 0; memid < st->MemopCount; memid++){
                 uint32_t bbid;
                 RangeStats* r = (RangeStats*)st->Stats[indexInStats];
                 if (st->PerInstruction){

@@ -58,7 +58,7 @@ void CacheSimulationTool::AddNewStreamStats(AddressStreamStats* stats) {
         CacheStructureHandler* currHandler = (CacheStructureHandler*)(
           handlers[i]);
         stats->Stats[indexInStats + i] = new CacheStats(currHandler->
-          GetNumberOfCacheLevels(), currHandler->GetSysId(), stats->AllocCount, 
+          GetNumberOfCacheLevels(), currHandler->GetSysId(), stats->MemopCount, 
           currHandler->IsKeepingMemoryLog());
         CacheStats* cacheStats = (CacheStats*)stats->Stats[indexInStats 
           + i];
@@ -160,7 +160,7 @@ void CacheSimulationTool::FinalizeTool(DataManager<AddressStreamStats*>*
 
                 aggstats[sys] = c;
 
-                for (uint32_t memid = 0; memid < st->AllocCount; memid++){
+                for (uint32_t memid = 0; memid < st->MemopCount; memid++){
                     uint32_t bbid;
                     if (st->PerInstruction){
                         bbid = memid;
