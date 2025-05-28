@@ -326,12 +326,6 @@ AddressStreamStats* GenerateStreamStats(AddressStreamStats* stats, uint32_t typ,
     stats->FirstImage = (firstimage == iid);
     stats->ThreadSeq = allData->GetThreadSequence(tid, false);
 
-    if(stats->MemopCount > stats->BlockCount) {
-        stats->AllocCount = stats->MemopCount;
-    } else {
-        stats->AllocCount = stats->BlockCount;
-    }
-
     // Initialize Stream Stats
     Driver->InitializeStatsWithNewStreamStats(stats);
 #endif

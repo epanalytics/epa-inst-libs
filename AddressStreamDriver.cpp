@@ -537,24 +537,24 @@ void AddressStreamDriver::InitializeStatsWithNewStreamStats(AddressStreamStats*
     stats->Stats = new StreamStats*[GetNumMemoryHandlers()];
     bzero(stats->Stats, sizeof(StreamStats*) * GetNumMemoryHandlers());
 
-    uint32_t originalAllocCount = stats->AllocCount;
+    uint32_t originalMemopCount = stats->MemopCount;
 
     uint32_t toolIndex = 0;
     for (vector<AddressStreamTool*>::iterator it = tools->begin(); it !=
       tools->end(); it++) {
-          // For Data-Centric tools, set AllocCount to number of data
+          // For Data-Centric tools, set MemopCount to number of data
           // structures if no METASIM_DS_SIZE is set, else use the set
           // METASIM_DS_SIZE
         if (toolIndex == numCodeCentricTools) {
-            stats->AllocCount = GET_NUM_DATA_STRUCTURES(dataStructureModule, parser);
+            stats->MemopCount = GET_NUM_DATA_STRUCTURES(dataStructureModule, parser);
         }
         toolIndex++;
         AddressStreamTool* currentTool = (*it);
         currentTool->AddNewStreamStats(stats);
     }
 
-    // Reset AllocCount
-    stats->AllocCount = originalAllocCount;
+    // Reset MemopCount
+    stats->MemopCount = originalMemopCount;
 }
 #endif
 

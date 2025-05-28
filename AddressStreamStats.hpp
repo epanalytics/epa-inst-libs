@@ -142,7 +142,6 @@ typedef struct AddressStreamStats_s {
     uint32_t SVEVectorLength;  // Used only by EPAX
     uint32_t Phase;
 #ifndef SLIMSTATS
-    uint32_t AllocCount;
     uint32_t BlockCount;
     uint32_t GroupCount;
     uint32_t MemopCount;
