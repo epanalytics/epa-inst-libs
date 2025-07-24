@@ -57,6 +57,7 @@ class AddressStreamDriver {
   private:
     // Are we running these tools?
     bool runAddressRange;
+    bool runArielFrontend;
     bool runCacheSimulation;
     bool runEntropyRange;
     bool runHardwarePrefetching;
@@ -84,7 +85,8 @@ class AddressStreamDriver {
     FastData<AddressStreamStats*, BufferEntry*>* fastData = NULL;
     // set of instrumentation points that add addresses to the buffer
     std::set<uint64_t>* liveMemoryAccessInstPointKeys = NULL;  
-
+    bool slicerPaused;  // Keeps track of whether the instrumentation has been
+                        // turned off by the slicer
     StringParser* parser = NULL;
 
     std::string variableNameFile; // For data structure module
@@ -98,6 +100,7 @@ class AddressStreamDriver {
     AddressStreamDriver();
     virtual ~AddressStreamDriver();
 
+    bool BuiltWithArielFrontend();
     bool BuiltWithDataStructureModule();
     bool BuiltWithEPATools();
 
@@ -110,6 +113,7 @@ class AddressStreamDriver {
     void ExitTool(bool needToExit);
 
     void* FinalizeImage(image_key_t*);
+    void FinalizeThread(thread_key_t tid);
 
     DataManager<AddressStreamStats*>* GetAllData() { return allData; }
     void GetAndSetVariableNameFile();
@@ -141,6 +145,7 @@ class AddressStreamDriver {
 #endif
 
     bool IsAddressRange() { return runAddressRange; }
+    bool IsArielFrontend() { return runArielFrontend; }
     bool IsCacheSimulation() { return runCacheSimulation; }
     bool IsEntropyRange() { return runEntropyRange; }
     bool IsHardwarePrefetching() { return runHardwarePrefetching; }
@@ -151,6 +156,8 @@ class AddressStreamDriver {
 
     bool IsCodeCentric() { return runCodeCentric; }
     bool IsDataCentric() { return runDataCentric; }
+
+    void NotifyDoneMPIInit();
 
     void PauseApplicationWrappers();
     void ProcessAllBuffers(ProcessBuffersExtra extra = 
@@ -189,6 +196,7 @@ class AddressStreamDriver {
     void AddTool(AddressStreamTool* t) { tools->push_back(t); }
     AddressStreamTool* GetTool(uint32_t index);
     void SetAddressRange(bool b) { runAddressRange = b; }
+    void SetArielFrontend(bool b) { runArielFrontend = b; }
     void SetCacheSimulation(bool b) { runCacheSimulation = b; }
     void SetHardwarePrefetching(bool b) { runHardwarePrefetching = b; }
     void SetReuseDistance(bool b) { runReuseDistance = b; }

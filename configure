@@ -642,6 +642,8 @@ MPI_CXXFLAGS
 MPI_FLAGS
 MPICXX
 MPICC
+SST_INCLUDES
+SST_AVAILABLE
 THROTTLER_FLAGS
 EGREP
 GREP
@@ -700,6 +702,8 @@ ac_subst_files=''
 ac_user_opts='
 enable_option_checking
 with_throttler_headers
+with_sst_core
+with_sst_elements
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1323,6 +1327,9 @@ Optional Packages:
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
   --with-throttler-headers=<path>
                           specify path to throttler headers
+  --with-sst-core=<path>  specify path to sst-core
+  --with-sst-elements=<path>
+                          specify path to sst-elements
 
 Some influential environment variables:
   CXX         C++ compiler command
@@ -3881,6 +3888,38 @@ else
   throttler_headers=no
 fi
 
+
+
+
+# Check whether --with-sst_core was given.
+if test "${with_sst_core+set}" = set; then :
+  withval=$with_sst_core; sst_core=$withval
+else
+  sst_core=no
+fi
+
+
+# Check whether --with-sst_elements was given.
+if test "${with_sst_elements+set}" = set; then :
+  withval=$with_sst_elements; sst_elements=$withval
+else
+  sst_elements=no
+fi
+
+SST_AVAILABLE="no"
+SST_INCLUDES=""
+if test "x$sst_core" != "xno"; then
+    if test "x$sst_elements" != "xno"; then
+        SST_AVAILABLE="yes"
+        SST_INCLUDES="-I$sst_core/include/sst/core -I$sst_core/include -I$sst_elements/src/sst/elements/ariel"
+    else
+        as_fn_error $? "--with-sst-elements must be set if using --with-sst-core" "$LINENO" 5
+    fi
+else
+    if test "x$sst_elements" != "xno"; then
+        as_fn_error $? "--with-sst-core must be set if using --with-sst-elements" "$LINENO" 5
+    fi
+fi
 
 
 

@@ -51,7 +51,7 @@ void ScatterGatherLengthTool::AddNewHandlers(AddressStreamStats* stats) {
 }
 
 void ScatterGatherLengthTool::AddNewStreamStats(AddressStreamStats* stats) {
-    stats->Stats[indexInStats] = new VectorLengthStats(stats->AllocCount);
+    stats->Stats[indexInStats] = new VectorLengthStats(stats->MemopCount);
 }
 
 uint32_t ScatterGatherLengthTool::CreateHandlers(uint32_t index, StringParser* parser) {
@@ -172,9 +172,9 @@ void ScatterGatherLengthTool::FinalizeTool(DataManager<AddressStreamStats*>*
             // Stats are collected by memid. We need to present them by
             // block. Even if perinsn, just create new VectorLengthStats 
             // data structure and compile per-memid data into it
-            aggLengths = new VectorLengthStats(st->AllocCount);
+            aggLengths = new VectorLengthStats(st->BlockCount);
 
-            for (uint32_t memid = 0; memid < st->AllocCount; memid++){
+            for (uint32_t memid = 0; memid < st->MemopCount; memid++){
                 uint32_t bbid;
                 VectorLengthStats* vls = (VectorLengthStats*)st->Stats[
                   indexInStats];

@@ -62,6 +62,15 @@ extern "C" {
 
     void epa_pebil_pause_() { epa_pebil_pause(); return; }
 
+    // The Ariel API has some defined user functions that we need to handle
+    // But only if we are building the Ariel Frontend
+#ifdef HAS_ARIEL_FRONTEND
+    void ariel_enable() { epa_pebil_start(); return; }
+    void ariel_enable_() { ariel_enable(); return; }
+    void ariel_disable() { epa_pebil_pause(); return; }
+    void ariel_disable_() { ariel_disable(); return; }
+#endif
+
     // Create mutex to esnure that dynamicPoints are initialized exactly once
     static pthread_rwlock_t dynamic_init_rwlock = PTHREAD_RWLOCK_INITIALIZER;
     // Called at just before image initialization
@@ -108,6 +117,7 @@ extern "C" {
 
     // Called after MPI_Init is called
     void* tool_mpi_init(){
+        Driver->NotifyDoneMPIInit();
         Driver->UnpauseApplicationWrappers();
         return NULL;
     }
@@ -140,6 +150,8 @@ extern "C" {
     void* tool_thread_fini(thread_key_t tid){
         SAVE_STREAM_FLAGS(cout);
         inform << "Destroying thread " << hex << tid << ENDL;
+        if (Driver != NULL)
+            Driver->FinalizeThread(tid);
         RESTORE_STREAM_FLAGS(cout);
         return NULL;
     }
@@ -312,12 +324,7 @@ AddressStreamStats* GenerateStreamStats(AddressStreamStats* stats, uint32_t typ,
 
 #ifndef SLIMSTATS
     stats->FirstImage = (firstimage == iid);
-
-    if(stats->MemopCount > stats->BlockCount) {
-        stats->AllocCount = stats->MemopCount;
-    } else {
-        stats->AllocCount = stats->BlockCount;
-    }
+    stats->ThreadSeq = allData->GetThreadSequence(tid, false);
 
     // Initialize Stream Stats
     Driver->InitializeStatsWithNewStreamStats(stats);

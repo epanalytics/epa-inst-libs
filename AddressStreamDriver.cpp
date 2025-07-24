@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is part of the pebil project.
  * 
  * Copyright (c) 2010, University of California Regents
@@ -37,6 +37,10 @@
 #include <ScatterGatherLength.hpp>
 #include <SpatialLocality.hpp>
 
+#ifdef HAS_ARIEL_FRONTEND
+#include <ArielFrontend.hpp>
+#endif
+
 #ifdef HAS_EPA_TOOLS
 #include <DataCentricAddressRange.hpp>
 #include <DataCentricSpatialLocality.hpp>
@@ -51,6 +55,10 @@
 
 #ifdef HAS_DATA_STRUCTURE_MODULE
 #include <DataStructureModule.hpp>
+#endif
+
+#ifdef HAS_OPENMP
+#include <omp.h>
 #endif
 
 #include <stdio.h>
@@ -73,10 +81,18 @@ using namespace std;
 
 #ifndef SLIMSTATS
     // Define directives to keep #ifdefs out of code
+    #ifdef HAS_ARIEL_FRONTEND
+      #define GENERATE_ARIEL_TOOL new ArielFrontendTool()
+    #else
+      #define GENERATE_ARIEL_TOOL 0
+    #endif
+
     #ifdef HAS_EPA_TOOLS
+      #define GENERATE_ENTROPY_TOOL new EntropyRangeTool()
       #define GENERATE_PREFETCH_TOOL new PrefetchSimulationTool()
       #define GENERATE_SPATIAL_MEMOP_TOOL new SpatialLocalityPerMemOpTool()
     #else
+      #define GENERATE_ENTROPY_TOOL 0
       #define GENERATE_PREFETCH_TOOL 0
       #define GENERATE_SPATIAL_MEMOP_TOOL 0
     #endif
@@ -120,6 +136,7 @@ AddressStreamDriver::AddressStreamDriver() {
 
     // Only run Cache Simulation by default
     runAddressRange = false;
+    runArielFrontend = false;
     runCacheSimulation = true;
     runEntropyRange = false;
     runHardwarePrefetching = false;
@@ -141,6 +158,7 @@ AddressStreamDriver::AddressStreamDriver() {
 
     // Create a parser for parsing
     parser = new StringParser();
+    slicerPaused = false;
 
     variableNameFile = "";
 
@@ -166,6 +184,14 @@ AddressStreamDriver::~AddressStreamDriver() {
     delete fastData;
 
     DELETE_MODULE(dataStructureModule);
+}
+
+bool AddressStreamDriver::BuiltWithArielFrontend() {
+    #ifdef HAS_ARIEL_FRONTEND
+    return true;
+    #else
+    return false;
+    #endif
 }
 
 bool AddressStreamDriver::BuiltWithDataStructureModule() {
@@ -313,6 +339,10 @@ void* AddressStreamDriver::FinalizeImage(image_key_t* key) {
     return NULL;
 }
 
+void AddressStreamDriver::FinalizeThread(thread_key_t tid) {
+    allData->FinishThread(tid);
+}
+
 // Look for a file that has variable names and locations
 // This will get passed onto the data structure module
 void AddressStreamDriver::GetAndSetVariableNameFile() {
@@ -386,6 +416,7 @@ void AddressStreamDriver::InitializeKeys() {
         sampler->WriteLock();
         //SetDynamicPoints(false);
         dynamicPoints->SetDynamicPoints(*liveMemoryAccessInstPointKeys, false);
+        slicerPaused = true;
         sampler->UnLock();
     }
 #endif
@@ -424,6 +455,22 @@ void* AddressStreamDriver::InitializeNewImage(image_key_t* iid,
 
     // Remove initialization instrumentation points for this image
     dynamicPoints->SetDynamicPoint(GENERATE_KEY(*iid, PointType_inits), false);
+
+#ifdef HAS_OPENMP
+    // The Ariel frontend requires thread sequence numbers to be in order from
+    // 0 to (N-1). Run an openmp loop before MPI_Init so that we add user
+    // threads before MPI helper threads
+#ifdef HAS_ARIEL_FRONTEND
+    volatile int x = 0;
+    #pragma omp parallel
+    {
+        #pragma omp critical
+        {
+            x += 1;
+        }
+    }
+#endif
+#endif
 
     return NULL;
 }
@@ -488,26 +535,33 @@ void AddressStreamDriver::InitializeStatsWithNewStreamStats(AddressStreamStats*
     stats->Stats = new StreamStats*[GetNumMemoryHandlers()];
     bzero(stats->Stats, sizeof(StreamStats*) * GetNumMemoryHandlers());
 
-    uint32_t originalAllocCount = stats->AllocCount;
+    uint32_t originalMemopCount = stats->MemopCount;
 
     uint32_t toolIndex = 0;
     for (vector<AddressStreamTool*>::iterator it = tools->begin(); it !=
       tools->end(); it++) {
-          // For Data-Centric tools, set AllocCount to number of data
+          // For Data-Centric tools, set MemopCount to number of data
           // structures if no METASIM_DS_SIZE is set, else use the set
           // METASIM_DS_SIZE
         if (toolIndex == numCodeCentricTools) {
-            stats->AllocCount = GET_NUM_DATA_STRUCTURES(dataStructureModule, parser);
+            stats->MemopCount = GET_NUM_DATA_STRUCTURES(dataStructureModule, parser);
         }
         toolIndex++;
         AddressStreamTool* currentTool = (*it);
         currentTool->AddNewStreamStats(stats);
     }
 
-    // Reset AllocCount
-    stats->AllocCount = originalAllocCount;
+    // Reset MemopCount
+    stats->MemopCount = originalMemopCount;
 }
 #endif
+
+void AddressStreamDriver::NotifyDoneMPIInit() {
+    for (vector<AddressStreamTool*>::iterator it = tools->begin(); it !=
+      tools->end(); it++) {
+        (*it)->NotifyDoneMPIInit();
+    }
+}
 
 void AddressStreamDriver::PauseApplicationWrappers() {
     PAUSE_MODULE(dataStructureModule);
@@ -533,8 +587,8 @@ void AddressStreamDriver::ProcessAllBuffers(ProcessBuffersExtra extra) {
     fastData->Lock();
     allData->WriteLock();
     sampler->WriteLock();
-    SuspendAllThreads(allData->CountThreads(false), 
-      allData->allthreads.begin(), allData->allthreads.end());
+    SuspendAllThreads(allData->livethreads.size(),
+      allData->livethreads.begin(), allData->livethreads.end());
 
     // Go through each image and thread and process their buffers
     for (set<image_key_t>::iterator iit = allData->allimages.begin();
@@ -548,8 +602,10 @@ void AddressStreamDriver::ProcessAllBuffers(ProcessBuffersExtra extra) {
     // Do we need to turn instrumentation on/off after processing?
     if (extra == ProcessBuffersExtra_setDynamicOn) {
         dynamicPoints->SetDynamicPoints(*liveMemoryAccessInstPointKeys, true);
+        slicerPaused = false;
     } else if (extra == ProcessBuffersExtra_setDynamicOff) {
         dynamicPoints->SetDynamicPoints(*liveMemoryAccessInstPointKeys, false);
+        slicerPaused = true;
     }
 
     // resume all threads
@@ -946,10 +1002,17 @@ uint64_t AddressStreamDriver::ProcessBufferForEachHandler(image_key_t iid,
                 ss->SetIsCodeCentric(false);
             }
 
-            // maxNumAddresses is the allocated size of the array when it was 
-            // created, the length is the number of actual elements used
-            (void) handler->Process((void*)ss, memSeq, ldstFlag,
-              stats->addressesForProcessing, length, memvecFlag);
+            if (reference->type == INSN_COUNT) {
+                handler->ProcessInstructions((void*)ss, memSeq,
+                  reference->regularinsns);
+            } else {
+                handler->ProcessInstructions((void*)ss, memSeq,
+                  reference->regularinsns);
+                // maxNumAddresses is the allocated size of the array when it
+                // was created, the length is the number of actual elements used
+                (void) handler->Process((void*)ss, memSeq, ldstFlag,
+                  stats->addressesForProcessing, length, memvecFlag);
+            }
         }// for number of handlers
 #else
         // stats holds a pointer to size (up and down converted)
@@ -1042,9 +1105,13 @@ void* AddressStreamDriver::ProcessThreadBuffer(image_key_t iid, thread_key_t
       << "Capacity " << dec << capacity << TAB << "Total " << dec 
       << sampler->GetAccessCount() << ENDL);
 
-    // If there is no more instrumentation, return
-    // Thread-Safe call
-    if (!HasLiveInstrumentationPoints(lock)){
+    // If there is no more instrumentation (Thread-Safe call), return
+    // If the slicer has paused instrumentation, return
+    // Note -- slicer is not protected by a lock right now. We could take a hit
+    // to performance to do so, but if it *needs* to be protected by a lock,
+    // then I think the slicer is not being used correctly (it's a global
+    // slicer, so I don't know how slicing in a threaded region would work)
+    if (!HasLiveInstrumentationPoints(lock) || slicerPaused) {
         UnLockDSM(lock);
         DONE_WITH_BUFFER();
     }
@@ -1088,8 +1155,8 @@ void* AddressStreamDriver::ProcessThreadBuffer(image_key_t iid, thread_key_t
             // We are modifiying dynamic points. Use the sampler write 
             // lock to protect this action
             sampler->WriteLock();
-            SuspendAllThreads(allData->CountThreads(false), 
-              allData->allthreads.begin(), allData->allthreads.end());
+            SuspendAllThreads(allData->livethreads.size(),
+              allData->livethreads.begin(), allData->livethreads.end());
         }
         dynamicPoints->SetDynamicPoints(*liveMemoryAccessInstPointKeys,
           !(isSampling));
@@ -1163,6 +1230,7 @@ void AddressStreamDriver::SetUpDataStructureModule() {
 void AddressStreamDriver::SetUpTools() {
     // Check for which tools to use
     uint32_t doAddressRange;
+    uint32_t doArielFrontend;
     uint32_t doCacheSimulation;
     uint32_t doEntropyRange;
     uint32_t doHardwarePrefetching;
@@ -1172,6 +1240,9 @@ void AddressStreamDriver::SetUpTools() {
     uint32_t doSpatialLocalityPerMemOp;
     if (parser->ReadEnvUint32("METASIM_ADDRESS_RANGE", &doAddressRange)){
         runAddressRange = (doAddressRange == 0) ? false : true;
+    }
+    if (parser->ReadEnvUint32("METASIM_ARIEL_FRONTEND", &doArielFrontend)){
+        runArielFrontend = (doArielFrontend == 0) ? false : true;
     }
     if (parser->ReadEnvUint32("METASIM_CACHE_SIMULATION", &doCacheSimulation)){
         runCacheSimulation = (doCacheSimulation == 0) ? false : true;
@@ -1220,12 +1291,28 @@ void AddressStreamDriver::SetUpTools() {
         tools->push_back(new AddressRangeTool());
     }
 
+    if (runArielFrontend && runCodeCentric) {
+        if (BuiltWithArielFrontend()) {
+            tools->push_back(GENERATE_ARIEL_TOOL);
+        } else {
+            DISPLAY_ERROR << "No ariel frontend library included. "
+              << "Unset Ariel frontend library tool. Exitting." << ENDL;
+            exit(0);
+        }
+    }
+
     if (runCacheSimulation && runCodeCentric) {
         tools->push_back(new CacheSimulationTool());
     }
 
     if (runEntropyRange && runCodeCentric) {
-        tools->push_back(new EntropyRangeTool());
+        if (BuiltWithEPATools()) {
+            tools->push_back(GENERATE_ENTROPY_TOOL);
+        } else {
+            DISPLAY_ERROR << "No entropy range library linked. "
+              << "Unset entropy range library tool. Exitting." << ENDL;
+            exit(0);
+        }
     }
 
     if (runHardwarePrefetching) {
@@ -1369,8 +1456,8 @@ void AddressStreamDriver::ShutOffInstrumentationInBlocks(set<uint64_t>& blocks,
     if (suspend) {
         allData->ReadLock();
         sampler->WriteLock();
-        SuspendAllThreads(allData->CountThreads(false), 
-          allData->allthreads.begin(), allData->allthreads.end());
+        SuspendAllThreads(allData->livethreads.size(),
+          allData->livethreads.begin(), allData->livethreads.end());
     }
 
     uint64_t imageSequence = (uint32_t)allData->GetImageSequence(iid, false);
@@ -1417,8 +1504,8 @@ void AddressStreamDriver::ShutOffInstrumentationInMaxedGroups(image_key_t iid,
     if (suspend) {
         allData->ReadLock();
         sampler->WriteLock();
-        SuspendAllThreads(allData->CountThreads(false), 
-          allData->allthreads.begin(), allData->allthreads.end());
+        SuspendAllThreads(allData->livethreads.size(),
+          allData->livethreads.begin(), allData->livethreads.end());
     }
     
     for (set<uint64_t>::iterator it = liveMemoryAccessInstPointKeys->begin();

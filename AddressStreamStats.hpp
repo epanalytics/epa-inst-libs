@@ -38,6 +38,7 @@ enum EntryType: uint8_t {
   VECTOR_ENTRY,
   EPAX_VECTOR_ENTRY,
   EPAX_INDIRECT_ENTRY,
+  INSN_COUNT,
   EntryType_Total
 };
 
@@ -104,7 +105,8 @@ typedef struct BufferEntry_s {
     uint8_t         loadstoreflag;   // Dirty Caching
     uint64_t        imageid;         // Multi-image
     // identifies memop in image // for MemTrace we use the raw insnAddrres
-    uint64_t        memseq;          
+    uint64_t        memseq;
+    uint64_t        regularinsns;    // # non-memory insns before this memop
     union {
         uint64_t address;        // value simulated
         struct VectorAddress vectorAddress;
@@ -140,15 +142,19 @@ typedef struct AddressStreamStats_s {
     uint32_t SVEVectorLength;  // Used only by EPAX
     uint32_t Phase;
 #ifndef SLIMSTATS
-    uint32_t AllocCount;
     uint32_t BlockCount;
     uint32_t GroupCount;
     uint32_t MemopCount;
     char* Application;
     char* Extension;
+    uint32_t ThreadSeq;
 
     // per-memop data
     uint64_t* BlockIds;   // Indices into per-block data, like counter
+    bool* IsDP;           // Is double-precision? False - single-precision
+    bool* IsFP;           // Is floating-point ins (for Ariel)
+    uint32_t* SizeInBytes;// Size of load or store in bytes
+    uint64_t* Addresses;
 
     // per-block data
     CounterTypes* Types; // If Counter is a count or index to a count
@@ -161,7 +167,7 @@ typedef struct AddressStreamStats_s {
     uint32_t* Lines;
     char** Functions;
     uint64_t* Hashes;
-    uint64_t* Addresses;
+    //uint64_t* Addresses;
     uint64_t* GroupIds;
     StreamStats** Stats; // indexed by handler
 #endif
