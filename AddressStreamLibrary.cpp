@@ -225,6 +225,7 @@ extern "C" {
         (void) Driver->FinalizeImage(key);
         Driver->DeleteAllData();
         delete Driver;
+        Driver = NULL; // Protect from threads that don't get cleaned up
         return NULL;
     }
 
