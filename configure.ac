@@ -49,6 +49,26 @@ AC_ARG_WITH(throttler_headers,
             [throttler_headers=no])
 AC_SUBST(THROTTLER_FLAGS)
 
+AC_ARG_WITH(sst_core, [AS_HELP_STRING([--with-sst-core=<path>], [specify path
+  to sst-core])], [sst_core=$withval], [sst_core=no])
+AC_ARG_WITH(sst_elements, [AS_HELP_STRING([--with-sst-elements=<path>], 
+  [specify path to sst-elements])], [sst_elements=$withval], [sst_elements=no])
+SST_AVAILABLE="no"
+SST_INCLUDES=""
+if test "x$sst_core" != "xno"; then
+    if test "x$sst_elements" != "xno"; then
+        SST_AVAILABLE="yes"
+        SST_INCLUDES="-I$sst_core/include/sst/core -I$sst_core/include -I$sst_elements/src/sst/elements/ariel"
+    else
+        AC_MSG_ERROR(--with-sst-elements must be set if using --with-sst-core)
+    fi
+else
+    if test "x$sst_elements" != "xno"; then
+        AC_MSG_ERROR(--with-sst-core must be set if using --with-sst-elements)
+    fi
+fi
+AC_SUBST(SST_AVAILABLE)
+AC_SUBST(SST_INCLUDES)
 
 # Get the following flags from a tool configuration
 AC_SUBST(MPICC)
@@ -66,6 +86,7 @@ AC_SUBST(INST_LIBS_BINDIR)
 AC_SUBST(PEBIL_VERBOSE_SLICER)
 AC_SUBST(INST_TOOL_FLAGS)
 AC_SUBST(SHMEM_FLAGS)
+AC_SUBST(SLIM_STATS)
 
 
 # Checks for header files.

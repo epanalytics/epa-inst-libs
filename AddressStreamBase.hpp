@@ -23,6 +23,7 @@
 
 #include <vector>
 #include <string>
+// for CounterTypes
 #include <AddressStreamStats.hpp>
 
 template <class T> class DataManager;
@@ -46,6 +47,7 @@ class AddressStreamTool {
     virtual uint32_t CreateHandlers(uint32_t, StringParser*) = 0;
     virtual void FinalizeTool(DataManager<AddressStreamStats*>*, 
       SamplingMethod*) = 0;
+    virtual void NotifyDoneMPIInit() {}
 };
 
 class StreamStats {
@@ -105,6 +107,8 @@ class MemoryStreamHandler {
     virtual uint32_t Process(void* stats, uint64_t memSeq, bool ldstFlag,
       uint64_t* addresses, uint64_t length, bool memvecFlag) 
       = 0;
+    virtual void ProcessInstructions(void* stats, uint64_t memSeq,
+      uint64_t numInsns) {}
     // Number of addresses that appeared but aren't processed
     virtual void SkipAddresses(uint32_t numToSkip) {};
     virtual bool Verify() = 0;

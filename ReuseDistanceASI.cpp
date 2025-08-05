@@ -18,6 +18,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef SLIMSTATS
+
 #include <InstrumentationCommon.hpp>
 #include <DataManager.hpp>
 #include <DynamicInstrumentation.hpp>
@@ -179,3 +181,5 @@ uint32_t ReuseDistanceHandler::Process(void* stats, uint64_t memSeq,
 void ReuseDistanceHandler::SkipAddresses(uint32_t numToSkip) {
     internalHandler->SkipAddresses(numToSkip);
 }
+
+#endif

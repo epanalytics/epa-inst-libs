@@ -62,11 +62,21 @@ extern "C" {
 
     void epa_pebil_pause_() { epa_pebil_pause(); return; }
 
+    // The Ariel API has some defined user functions that we need to handle
+    // But only if we are building the Ariel Frontend
+#ifdef HAS_ARIEL_FRONTEND
+    void ariel_enable() { epa_pebil_start(); return; }
+    void ariel_enable_() { ariel_enable(); return; }
+    void ariel_disable() { epa_pebil_pause(); return; }
+    void ariel_disable_() { ariel_disable(); return; }
+#endif
+
     // Create mutex to esnure that dynamicPoints are initialized exactly once
     static pthread_rwlock_t dynamic_init_rwlock = PTHREAD_RWLOCK_INITIALIZER;
     // Called at just before image initialization
     void* tool_dynamic_init(uint64_t* count, DynamicInst** dyn, bool* 
       isThreadedModeFlag){
+
         pthread_rwlock_wrlock(&dynamic_init_rwlock);
         SAVE_STREAM_FLAGS(cout);
         if (Driver == NULL) {
@@ -77,6 +87,7 @@ extern "C" {
             dynamicPoints = new DynamicInstrumentation();
             Driver->SetDynamicPoints(dynamicPoints);
         }
+
         dynamicPoints->InitializeDynamicInstrumentation(count, dyn,
           isThreadedModeFlag);
         RESTORE_STREAM_FLAGS(cout);
@@ -93,6 +104,7 @@ extern "C" {
 
     // Called before MPI_Finalize is called
     void* tool_pre_mpi_fini() {
+        // data centric being turned on
         Driver->PauseApplicationWrappers();
         return NULL;
     }
@@ -105,6 +117,7 @@ extern "C" {
 
     // Called after MPI_Init is called
     void* tool_mpi_init(){
+        Driver->NotifyDoneMPIInit();
         Driver->UnpauseApplicationWrappers();
         return NULL;
     }
@@ -137,6 +150,8 @@ extern "C" {
     void* tool_thread_fini(thread_key_t tid){
         SAVE_STREAM_FLAGS(cout);
         inform << "Destroying thread " << hex << tid << ENDL;
+        if (Driver != NULL)
+            Driver->FinalizeThread(tid);
         RESTORE_STREAM_FLAGS(cout);
         return NULL;
     }
@@ -164,9 +179,13 @@ extern "C" {
         }
         assert(Driver);
 
+#ifndef SLIMSTATS
         bool entered = Driver->EnterTool();
+#endif
         (void) Driver->InitializeNewImage(key, stats, td);
+#ifndef SLIMSTATS
         Driver->ExitTool(entered);
+#endif
 
         pthread_rwlock_unlock(&dynamic_init_rwlock);
 
@@ -180,9 +199,13 @@ extern "C" {
         SAVE_STREAM_FLAGS(cout);
 
         image_key_t iid = *key;
+#ifndef SLIMSTATS
         bool entered = Driver->EnterTool();
+#endif
         Driver->ProcessThreadBuffer(iid, pthread_self());
+#ifndef SLIMSTATS
         Driver->ExitTool(entered);
+#endif
 
         RESTORE_STREAM_FLAGS(cout);
         return NULL;
@@ -194,8 +217,9 @@ extern "C" {
         Driver->PauseApplicationWrappers();
         // Only finalize images once
         static bool finalized = false;
-        if (finalized)
+        if (finalized) {
             return NULL;
+        }
 
         finalized = true;
         (void) Driver->FinalizeImage(key);
@@ -210,15 +234,17 @@ uint64_t ReferenceStreamStats(AddressStreamStats* stats){
     return (uint64_t)stats;
 }
 
-void DeleteStreamStats(AddressStreamStats* stats){
+void DeleteStreamStats(AddressStreamStats* stats) {
     // First delete memory allocated by every image/thread
     // Every image and thread allocates its own stream stats:
+#ifndef SLIMSTATS
     if (Driver->GetNumMemoryHandlers() > 0 && (stats->Stats != NULL)) {
         for (uint32_t i = 0; i < Driver->GetNumMemoryHandlers(); i++)
             delete stats->Stats[i];
         delete[] stats->Stats;
     }
     stats->Stats = NULL;
+#endif
 
     // Delete memory allocated for processing addresses (every image/thread)
     if (stats->addressesForProcessing != NULL)
@@ -282,8 +308,12 @@ AddressStreamStats* GenerateStreamStats(AddressStreamStats* stats, uint32_t typ,
     // allows us to avoid an extra memory ref on Counter updates
     if (typ == DataManagerType_Thread) {
         AddressStreamStats* s = stats;
+#ifndef SLIMSTATS
         stats = (AddressStreamStats*)malloc(sizeof(AddressStreamStats) + 
           (sizeof(uint64_t) * stats->BlockCount));
+#else
+        stats = (AddressStreamStats*)malloc(sizeof(AddressStreamStats));
+#endif
         assert(stats && "Couldn't allocate new stats object");
         memcpy(stats, s, sizeof(AddressStreamStats));
         stats->Initialized = false;
@@ -291,16 +321,14 @@ AddressStreamStats* GenerateStreamStats(AddressStreamStats* stats, uint32_t typ,
     assert(stats);
     stats->threadid = tid;
     stats->imageid = iid;
-    stats->FirstImage = (firstimage == iid);
 
-    if(stats->MemopCount > stats->BlockCount) {
-        stats->AllocCount = stats->MemopCount;
-    } else {
-        stats->AllocCount = stats->BlockCount;
-    }
+#ifndef SLIMSTATS
+    stats->FirstImage = (firstimage == iid);
+    stats->ThreadSeq = allData->GetThreadSequence(tid, false);
 
     // Initialize Stream Stats
     Driver->InitializeStatsWithNewStreamStats(stats);
+#endif
 
     // Initialize with other run data
     #ifdef EPAX_INST_TOOL
@@ -311,7 +339,7 @@ AddressStreamStats* GenerateStreamStats(AddressStreamStats* stats, uint32_t typ,
     stats->addressesForProcessing = (uint64_t*)malloc((sizeof(uint64_t) *
       stats->maxNumAddresses));
 
-    // Initialize Memory Handlers
+    // Initialize Memory Handlers 
     // Modified data generation (from DataManager) to always begin with the 
     // first image. Even if another image spawns the thread, pebil will 
     // GenerateStreamStats for the first image first. This allows us to 
@@ -321,10 +349,7 @@ AddressStreamStats* GenerateStreamStats(AddressStreamStats* stats, uint32_t typ,
         Driver->InitializeStatsWithNewHandlers(stats);
     } else {
         // Other images would share the handlers
-        // Calls ReadLock - Release lock
-        //allData->UnLock();
         AddressStreamStats* fs = allData->GetData(firstimage, tid, false);
-        //allData->WriteLock();
         stats->Handlers = fs->Handlers;
     }
 
@@ -344,6 +369,7 @@ AddressStreamStats* GenerateStreamStats(AddressStreamStats* stats, uint32_t typ,
         stats->Buffer = fs->Buffer;
     }
 
+#ifndef SLIMSTATS
     // each thread/image gets its own counters
     if (typ == DataManagerType_Thread){
         uint64_t tmp64 = (uint64_t)(stats) + (uint64_t)(sizeof(
@@ -358,6 +384,7 @@ AddressStreamStats* GenerateStreamStats(AddressStreamStats* stats, uint32_t typ,
             }
         }
     }
+#endif
 
     return stats;
 }

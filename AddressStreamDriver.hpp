@@ -29,6 +29,7 @@ class MemoryStreamHandler;
 class SamplingMethod;
 class AddressRangeTool;
 class CacheSimulationTool;
+class EntropyRangeTool;
 class ReuseDistanceTool;
 class ScatterGatherLengthTool;
 class SpatialLocalityTool;
@@ -54,10 +55,11 @@ typedef enum {
 // Class to hold important variables and functions together
 class AddressStreamDriver {
   private:
-  
     // Are we running these tools?
     bool runAddressRange;
+    bool runArielFrontend;
     bool runCacheSimulation;
+    bool runEntropyRange;
     bool runHardwarePrefetching;
     bool runReuseDistance;
     bool runScatterLength;
@@ -83,7 +85,8 @@ class AddressStreamDriver {
     FastData<AddressStreamStats*, BufferEntry*>* fastData = NULL;
     // set of instrumentation points that add addresses to the buffer
     std::set<uint64_t>* liveMemoryAccessInstPointKeys = NULL;  
-
+    bool slicerPaused;  // Keeps track of whether the instrumentation has been
+                        // turned off by the slicer
     StringParser* parser = NULL;
 
     std::string variableNameFile; // For data structure module
@@ -97,6 +100,7 @@ class AddressStreamDriver {
     AddressStreamDriver();
     virtual ~AddressStreamDriver();
 
+    bool BuiltWithArielFrontend();
     bool BuiltWithDataStructureModule();
     bool BuiltWithEPATools();
 
@@ -109,6 +113,7 @@ class AddressStreamDriver {
     void ExitTool(bool needToExit);
 
     void* FinalizeImage(image_key_t*);
+    void FinalizeThread(thread_key_t tid);
 
     DataManager<AddressStreamStats*>* GetAllData() { return allData; }
     void GetAndSetVariableNameFile();
@@ -135,10 +140,14 @@ class AddressStreamDriver {
       ThreadData* threadData);
     void* InitializeNewThread(thread_key_t tid);
     virtual void InitializeStatsWithNewHandlers(AddressStreamStats* stats);
+#ifndef SLIMSTATS
     virtual void InitializeStatsWithNewStreamStats(AddressStreamStats* stats);
+#endif
 
     bool IsAddressRange() { return runAddressRange; }
+    bool IsArielFrontend() { return runArielFrontend; }
     bool IsCacheSimulation() { return runCacheSimulation; }
+    bool IsEntropyRange() { return runEntropyRange; }
     bool IsHardwarePrefetching() { return runHardwarePrefetching; }
     bool IsReuseDistance() { return runReuseDistance; }
     bool IsScatterLength() { return runScatterLength; }
@@ -147,6 +156,8 @@ class AddressStreamDriver {
 
     bool IsCodeCentric() { return runCodeCentric; }
     bool IsDataCentric() { return runDataCentric; }
+
+    void NotifyDoneMPIInit();
 
     void PauseApplicationWrappers();
     void ProcessAllBuffers(ProcessBuffersExtra extra = 
@@ -162,7 +173,11 @@ class AddressStreamDriver {
     //void SetDynamicPoints(bool on);
 
     virtual void SetUpDataStructureModule();
+#ifndef SLIMSTATS
     virtual void SetUpTools();
+#else
+    virtual void SetUpMemTraceTool();
+#endif
 
     void ShutOffInstrumentationInAllBlocks();
     void ShutOffInstrumentationInBlock(uint64_t blockID, uint64_t imageSeq);
@@ -181,6 +196,7 @@ class AddressStreamDriver {
     void AddTool(AddressStreamTool* t) { tools->push_back(t); }
     AddressStreamTool* GetTool(uint32_t index);
     void SetAddressRange(bool b) { runAddressRange = b; }
+    void SetArielFrontend(bool b) { runArielFrontend = b; }
     void SetCacheSimulation(bool b) { runCacheSimulation = b; }
     void SetHardwarePrefetching(bool b) { runHardwarePrefetching = b; }
     void SetReuseDistance(bool b) { runReuseDistance = b; }

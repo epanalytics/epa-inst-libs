@@ -18,6 +18,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef SLIMSTATS
+
 #include <InstrumentationCommon.hpp>
 #include <DataManager.hpp>
 #include <Metasim.hpp>
@@ -38,7 +40,7 @@ void AddressRangeTool::AddNewHandlers(AddressStreamStats* stats) {
 }
 
 void AddressRangeTool::AddNewStreamStats(AddressStreamStats* stats) {
-    stats->Stats[indexInStats] = new RangeStats(stats->AllocCount);
+    stats->Stats[indexInStats] = new RangeStats(stats->MemopCount);
 }
 
 uint32_t AddressRangeTool::CreateHandlers(uint32_t index, StringParser* parser) {
@@ -67,7 +69,7 @@ void AddressRangeTool::FinalizeTool(DataManager<AddressStreamStats*>* AllData,
     uint64_t totalMemop = 0;
     // Calculate the number of access counts
     for (set<image_key_t>::iterator iit = AllData->allimages.begin();
-      iit != AllData->allimages.end(); iit++){
+      iit != AllData->allimages.end(); iit++) {
 
         for(DataManager<AddressStreamStats*>::iterator it =
           AllData->begin(*iit); it != AllData->end(*iit); ++it) {
@@ -157,9 +159,9 @@ void AddressRangeTool::FinalizeTool(DataManager<AddressStreamStats*>* AllData,
             // Stats are collected by memid. We need to present them by
             // block. Even if perinsn, just create new RangeStats data
             // structure and compile per-memid data into it
-            aggRange = new RangeStats(st->AllocCount);
+            aggRange = new RangeStats(st->BlockCount);
 
-            for (uint32_t memid = 0; memid < st->AllocCount; memid++){
+            for (uint32_t memid = 0; memid < st->MemopCount; memid++){
                 uint32_t bbid;
                 RangeStats* r = (RangeStats*)st->Stats[indexInStats];
                 if (st->PerInstruction){
@@ -320,4 +322,5 @@ uint32_t AddressRangeHandler::Process(void* stats, uint64_t memSeq,
     }
     return 0;
 }
-                
+
+#endif // #ifdef SLIMSTATS

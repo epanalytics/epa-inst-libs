@@ -18,6 +18,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef SLIMSTATS
+
 #include <InstrumentationCommon.hpp>
 #include <DataManager.hpp>
 #include <DynamicInstrumentation.hpp>
@@ -49,7 +51,7 @@ void ScatterGatherLengthTool::AddNewHandlers(AddressStreamStats* stats) {
 }
 
 void ScatterGatherLengthTool::AddNewStreamStats(AddressStreamStats* stats) {
-    stats->Stats[indexInStats] = new VectorLengthStats(stats->AllocCount);
+    stats->Stats[indexInStats] = new VectorLengthStats(stats->MemopCount);
 }
 
 uint32_t ScatterGatherLengthTool::CreateHandlers(uint32_t index, StringParser* parser) {
@@ -70,8 +72,7 @@ void ScatterGatherLengthTool::FinalizeTool(DataManager<AddressStreamStats*>*
 
     SGLengthFileName(stats,oFile);
     fileName=oFile.c_str();
-    inform << "Printing scatter gather vector length results to " << 
-      fileName << ENDL;
+    inform << "Printing results to " << fileName << ENDL;
     TryOpen(LengthFile,fileName);
 
     uint64_t sampledCount = 0;
@@ -156,7 +157,7 @@ void ScatterGatherLengthTool::FinalizeTool(DataManager<AddressStreamStats*>*
     LengthFile << "# " << "BLK" << TAB << "Sequence" << TAB << "Hashcode" 
       << TAB << "ImageSequence" << TAB << "ThreadId" << TAB 
       << "BlockCounter" << TAB << "InstructionSimulated" << TAB 
-      << "AvgVecLength" << TAB << "MinVecLength" << TAB << "MaxVecLength" 
+      << "Avg" << TAB << "Min" << TAB << "Max" 
       << ENDL;
 
     for (set<image_key_t>::iterator iit = AllData->allimages.begin(); 
@@ -171,9 +172,9 @@ void ScatterGatherLengthTool::FinalizeTool(DataManager<AddressStreamStats*>*
             // Stats are collected by memid. We need to present them by
             // block. Even if perinsn, just create new VectorLengthStats 
             // data structure and compile per-memid data into it
-            aggLengths = new VectorLengthStats(st->AllocCount);
+            aggLengths = new VectorLengthStats(st->BlockCount);
 
-            for (uint32_t memid = 0; memid < st->AllocCount; memid++){
+            for (uint32_t memid = 0; memid < st->MemopCount; memid++){
                 uint32_t bbid;
                 VectorLengthStats* vls = (VectorLengthStats*)st->Stats[
                   indexInStats];
@@ -374,3 +375,4 @@ uint32_t VectorLengthHandler::Process(void* stats, uint64_t memSeq,
    }*/
 }
                 
+#endif

@@ -22,8 +22,9 @@ EPA_TOOLS_AVAILABLE = @PEBIL_EPA_TOOLS_AVAILABLE@
 EPA_TOOLS_PATH = @PEBIL_SUBDIR_EPA_TOOLS_PATH@
 PEBIL_PAPI_BUILD = @PEBIL_PAPI_BUILD@
 PEBIL_PAPI_PATH = @PEBIL_PAPI_PATH@
+SST_AVAILABLE = @SST_AVAILABLE@
 
-PEBIL_LIBS = libpebilruntime.so libtimer.so libcounter.so libaddressstream.so libpebilslicer.so
+PEBIL_LIBS = libpebilruntime.so libtimer.so libcounter.so libaddressstream.so libaddressstream_omp.so libpebilslicer.so
 ifeq ($(PEBIL_PAPI_BUILD),yes)
 	PEBIL_LIBS += libpapifunc.so
 endif
@@ -35,7 +36,7 @@ LIB_TARGETS = $(foreach pebil_lib,$(PEBIL_LIBS),$(LIBDIR)/$(pebil_lib))
 MPICC       = @MPICC@
 MPICXX      = @MPICXX@
 CFLAGS      = @CFLAGS@ @MPI_FLAGS@ @CPUFREQ_FLAGS@ @THROTTLER_FLAGS@ @PEBIL_DEBUG@ @PEBIL_VERBOSE_SLICER@ @INST_TOOL_FLAGS@ @SHMEM_FLAGS@ -w
-CXXFLAGS    = @CXXFLAGS@ @MPI_CXXFLAGS@ @MPI_FLAGS@ @CPUFREQ_FLAGS@ @THROTTLER_FLAGS@ @PEBIL_DEBUG@ @PEBIL_VERBOSE_SLICER@ @INST_TOOL_FLAGS@ @SHMEM_FLAGS@ -w
+CXXFLAGS    = @CXXFLAGS@ @MPI_CXXFLAGS@ @MPI_FLAGS@ @CPUFREQ_FLAGS@ @THROTTLER_FLAGS@ @PEBIL_DEBUG@ @PEBIL_VERBOSE_SLICER@ @INST_TOOL_FLAGS@ @SHMEM_FLAGS@ @SLIM_STATS@ -w -Wno-error=register
 
 ALL_TARGETS	=	$(LIB_TARGETS)
 
@@ -54,11 +55,19 @@ endif
 COMMON_OBJS = $(LIBDIR)/InstrumentationCommon.o
 SHARED_COMMON_OBJS = $(LIBDIR)/InstrumentationCommon.O $(LIBDIR)/ThreadedCommon.O $(LIBDIR)/DynamicInstrumentation.O
 
-ASL_OBJS = $(LIBDIR)/AddressStreamBase.O $(LIBDIR)/AddressRange.O $(LIBDIR)/CacheSimulation.O $(LIBDIR)/ReuseDistanceASI.O $(LIBDIR)/ScatterGatherLength.O $(LIBDIR)/SpatialLocality.O $(LIBDIR)/AddressStreamDriver.O
+ASL_OBJS = $(LIBDIR)/AddressStreamBase.O $(LIBDIR)/AddressRange.O $(LIBDIR)/CacheSimulation.O $(LIBDIR)/ReuseDistanceASI.O $(LIBDIR)/ScatterGatherLength.O $(LIBDIR)/SpatialLocality.O
+
+ifeq ($(SST_AVAILABLE),yes)
+	EXTRA_INC += @SST_INCLUDES@
+  ASL_OBJS += $(LIBDIR)/ArielFrontend.O
+  EXTRA_FLAGS += -DHAS_ARIEL_FRONTEND
+endif
 
 ifeq ($(EPA_TOOLS_AVAILABLE),yes)
+  ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/EntropyRange.o
   ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/PrefetchSimulation.o
   ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/SpatialLocalityPerMemOp.o
+  ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/MemTrace.o
   EXTRA_FLAGS += -DHAS_EPA_TOOLS
   EXTRA_INC += -I$(EPA_TOOLS_PATH)/instcode
   # If the Data Structure Module is available
@@ -66,6 +75,7 @@ ifeq ($(EPA_TOOLS_AVAILABLE),yes)
     ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/DataCentricAddressRange.o
     ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/DataCentricSpatialLocality.o
     ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/DataCentricCacheSimulation.o
+    ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/DataCentricEntropyRange.o
     ASL_OBJS += $(EPA_TOOLS_PATH)/instcode/DataCentricReuseDistance.o
     EXTRA_FLAGS += -DHAS_DATA_STRUCTURE_MODULE
     ASL_LIBS = -L$(LIBDIR) -ldatastructuremodule
@@ -73,6 +83,9 @@ ifeq ($(EPA_TOOLS_AVAILABLE),yes)
     ASL_LIBS += -L$(EPA_TOOLS_PATH)/external/memory-container/src -lMemContainer
   endif
 endif
+
+ASL_OMP_OBJS = $(ASL_OBJS) $(LIBDIR)/AddressStreamDriver_omp.O
+ASL_NOOMP_OBJS = $(ASL_OBJS) $(LIBDIR)/AddressStreamDriver.O
 
 # opempi does not automatically link fortran mpi
 ifeq ($(MPICC), mpicc)
@@ -89,6 +102,8 @@ $(LIBDIR)/%.o: %.c
 	$(MPICC) $(CFLAGS) $(EXTRA_FLAGS) $(EXTRA_DEF) $(EXTRA_INC) -c -o $@ $< $(SHARED_OPT)
 $(LIBDIR)/%.O: %.cpp
 	$(MPICXX) $(CXXFLAGS) $(EXTRA_FLAGS) $(EXTRA_DEF) $(EXTRA_INC) -c -o $@ $< $(SHARED_OPT)
+$(LIBDIR)/%_omp.O: %.cpp
+	$(MPICXX) $(CXXFLAGS) -DHAS_OPENMP -fopenmp $(EXTRA_FLAGS) $(EXTRA_DEF) $(EXTRA_INC) -c -o $@ $< $(SHARED_OPT)
 
 $(LIBDIR)/libpebilruntime.so : $(SHARED_COMMON_OBJS)
 	$(MPICXX) $(SHARED_LIB) -o $@ $^ $(EXTRA_LIBS) $(CXXFLAGS)
@@ -101,8 +116,11 @@ $(LIBDIR)/libcounter.so : $(LIBDIR)/CounterFunctions.O $(SHARED_COMMON_OBJS)
 $(LIBDIR)/libcounter.a : $(LIBDIR)/CounterFunctions.o $(COMMON_OBJS)
 	$(AR) $@ $(LIBDIR)/CounterFunctions.o $(COMMON_OBJS)
 
-$(LIBDIR)/libaddressstream.so : $(LIBDIR)/AddressStreamLibrary.O $(ASL_OBJS) $(SHARED_COMMON_OBJS)
+$(LIBDIR)/libaddressstream.so : $(LIBDIR)/AddressStreamLibrary.O $(ASL_NOOMP_OBJS) $(SHARED_COMMON_OBJS)
 	$(MPICXX) $(SHARED_LIB) -o $@ $^ $(EXTRA_LIBS) $(ASL_LIBS) $(REUSE_LIBS) $(CXXFLAGS)
+
+$(LIBDIR)/libaddressstream_omp.so : $(LIBDIR)/AddressStreamLibrary.O $(ASL_OMP_OBJS) $(SHARED_COMMON_OBJS)
+	$(MPICXX) $(SHARED_LIB) -o $@ $^ -DHAS_OPENMP -fopenmp $(EXTRA_LIBS) $(ASL_LIBS) $(REUSE_LIBS) $(CXXFLAGS)
 
 $(LIBDIR)/libfrequencyconfig.so : $(LIBDIR)/FrequencyConfig.O
 	$(MPICXX) $(SHARED_LIB) -o $@ $^ $(EXTRA_LIBS) $(CXXFLAGS)

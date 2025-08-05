@@ -480,7 +480,7 @@ extern "C"
                     idx = i;
 
                 // Sum Counts from each thread
-                uint32_t counter = 0;
+                uint64_t counter = 0;
                 for(DataManager<CounterArray*>::iterator it = AllData->begin(
                   *iit); it != AllData->end(*iit); ++it) {
                     CounterArray* tc = it->second;

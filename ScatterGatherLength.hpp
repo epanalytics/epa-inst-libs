@@ -34,7 +34,8 @@ class ScatterGatherLengthTool : public AddressStreamTool {
     virtual uint32_t CreateHandlers(uint32_t index, StringParser* parser);
     virtual void FinalizeTool(DataManager<AddressStreamStats*>* AllData, 
       SamplingMethod* Sampler);
-    void SGLengthFileName(AddressStreamStats* stats, std::string& oFile);
+    virtual void SGLengthFileName(AddressStreamStats* stats,
+      std::string& oFile);
 };
 
 struct VectorLength {
@@ -62,7 +63,7 @@ public:
 
     void Aggregate(uint32_t memid, uint64_t count, uint64_t min, uint64_t max, 
       double avg);
-    void Update(uint32_t memid, uint64_t addr);
+    virtual void Update(uint32_t memid, uint64_t addr);
 
     bool Verify();
 };

@@ -20,6 +20,8 @@
 
 #include <InstrumentationCommon.hpp>
 #include <Metasim.hpp>
+// for pebil_map_type
+#include <InstrumentationCommon.hpp>
 #include <AddressStreamBase.hpp>
 
 #include <iostream>
@@ -32,11 +34,8 @@
 using namespace std;
 
 AddressStreamTool::~AddressStreamTool() {
-    for (vector<MemoryStreamHandler*>::iterator it = handlers.begin(); it !=
-      handlers.end(); it++) {
-        delete (*it);
-    }
-    handlers.clear();
+    // Handlers deleted by AddressStreamLibrary and should be done before we
+    // get here (see DeleteAllData)
 }
 
 // Only one thread should construct a SamplingMethod at a time
