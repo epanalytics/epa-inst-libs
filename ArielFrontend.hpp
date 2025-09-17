@@ -56,6 +56,7 @@ class ArielFrontendTool : public AddressStreamTool {
     virtual uint32_t CreateHandlers(uint32_t index, StringParser* parser);
     virtual void FinalizeTool(DataManager<AddressStreamStats*>* AllData,
       SamplingMethod* Sampler);
+    virtual void NotifyArielOutputStats(AddressStreamStats* stats);
     virtual void NotifyDoneMPIInit();
 };
 
@@ -102,6 +103,7 @@ public:
     void FinalizeTunnel();
     void InitializeTunnel();
     void InitializeTunnel(ArielFrontendHandler& h);
+    void OutputStats(uint32_t threadID);
     void Print(std::ofstream& f);
     uint32_t Process(void* stats, uint64_t memSeq, bool ldstFlag,
       uint64_t* addresses, uint64_t length, bool memvecFlag);

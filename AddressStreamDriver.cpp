@@ -558,6 +558,19 @@ void AddressStreamDriver::InitializeStatsWithNewStreamStats(AddressStreamStats*
 }
 #endif
 
+void AddressStreamDriver::NotifyArielOutputStats() {
+    // Thread-safety note: We are assuming that thread safety isn't all that
+    // important for this function and that it is not necessary to stop
+    // address stream collection before doing the output stats.
+    // This call to GetData should be thread-safe, but code following
+    // is not
+    AddressStreamStats* stats = (AddressStreamStats*)allData->GetData();
+    for (vector<AddressStreamTool*>::iterator it = tools->begin(); it !=
+      tools->end(); it++) {
+        (*it)->NotifyArielOutputStats(stats);
+    }
+}
+
 void AddressStreamDriver::NotifyDoneMPIInit() {
     for (vector<AddressStreamTool*>::iterator it = tools->begin(); it !=
       tools->end(); it++) {

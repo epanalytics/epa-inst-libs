@@ -69,6 +69,11 @@ extern "C" {
     void ariel_enable_() { ariel_enable(); return; }
     void ariel_disable() { epa_pebil_pause(); return; }
     void ariel_disable_() { ariel_disable(); return; }
+    void ariel_output_stats() {
+        Driver->NotifyArielOutputStats();
+        return;
+    }
+    void ariel_output_stats_() { ariel_output_stats(); return; }
 #endif
 
     // Create mutex to esnure that dynamicPoints are initialized exactly once

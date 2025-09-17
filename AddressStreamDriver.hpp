@@ -158,6 +158,7 @@ class AddressStreamDriver {
     bool IsCodeCentric() { return runCodeCentric; }
     bool IsDataCentric() { return runDataCentric; }
 
+    void NotifyArielOutputStats();
     void NotifyDoneMPIInit();
 
     void PauseApplicationWrappers();

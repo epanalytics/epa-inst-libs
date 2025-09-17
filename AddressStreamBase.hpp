@@ -47,6 +47,7 @@ class AddressStreamTool {
     virtual uint32_t CreateHandlers(uint32_t, StringParser*) = 0;
     virtual void FinalizeTool(DataManager<AddressStreamStats*>*, 
       SamplingMethod*) = 0;
+    virtual void NotifyArielOutputStats(AddressStreamStats* stats) {}
     virtual void NotifyDoneMPIInit() {}
 };
 
@@ -103,6 +104,7 @@ class MemoryStreamHandler {
     MemoryStreamHandler();
     virtual ~MemoryStreamHandler();
 
+    virtual void OutputStats(uint32_t threadID) {}
     virtual void Print(std::ofstream& f) = 0;
     virtual uint32_t Process(void* stats, uint64_t memSeq, bool ldstFlag,
       uint64_t* addresses, uint64_t length, bool memvecFlag) 
