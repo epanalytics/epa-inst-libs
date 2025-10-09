@@ -38,11 +38,19 @@
 using namespace std;
 
 int GetTaskId() {
+#ifdef HAVE_MPI
     return __taskid;
+#else
+    return 0;
+#endif
 }
 
 int GetNTasks(){
+#ifdef HAVE_MPI
     return __ntasks;
+#else
+    return 1;
+#endif
 }
 
 // a timer
