@@ -186,25 +186,15 @@ void CacheSimulationTool::FinalizeTool(DataManager<AddressStreamStats*>*
                 if (root->GetAccessCount(bbid) == 0) {
                     continue;
                 }
-                // this isn't necessarily true since this tool can suspend 
-                // threads at any point. potentially shutting off 
-                // instrumention in a block while a thread is midway through
-                // Sanity check data
-                // This assertion becomes FALSE when there are
-                // multiple addresses processed per address 
-                // (e.g. with scatter/gather)
-                if ((AllData->CountThreads() == 1) && 
-                  !st->HasNonDeterministicMemop[bbid]){
-                    if ((root->GetAccessCount(bbid) % 
-                      st->MemopsPerBlock[bbid]) != 0){
-                        inform << "bbid " << dec << bbid << " image " << 
-                          hex << (*iit) << " accesses " << dec << 
-                          root->GetAccessCount(bbid) << " memops " << 
-                          st->MemopsPerBlock[bbid] << ENDL;
-                    }
-                    assert(root->GetAccessCount(bbid) % 
-                      st->MemopsPerBlock[bbid] == 0);
-                }
+
+                // 07/25/2025
+                // Used to have a sanity check that the access count was a
+                // multiple of the number of memids in the block. This has
+                // caused more problems because increasingly:
+                // -- memids can produce multiple addresses (e.g., scatter,
+                //    arch64 load-pairs, etc)
+                // -- threads can be suspended at any point, potentially while
+                //    in the middle of a block
 
                 uint32_t idx;
                 if (st->Types[bbid] == CounterType_basicblock){
@@ -1137,6 +1127,9 @@ uint32_t CacheStructureHandler::ProcessAddress(CacheStats* stats, uint64_t
 
     if (address == 0)
         return 0;
+    if (address <= 1024)
+        fprintf(stderr, "Found suspiciously low address %lx at memseq %lu\n",
+          address, memseq);
 
     EvictionInfo evictInfo;
     evictInfo.level = INVALID_CACHE_LEVEL;

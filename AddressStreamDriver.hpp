@@ -61,6 +61,7 @@ class AddressStreamDriver {
     bool runCacheSimulation;
     bool runEntropyRange;
     bool runHardwarePrefetching;
+    bool runMemoryLogger;
     bool runReuseDistance;
     bool runScatterLength;
     bool runSpatialLocality;
@@ -157,6 +158,7 @@ class AddressStreamDriver {
     bool IsCodeCentric() { return runCodeCentric; }
     bool IsDataCentric() { return runDataCentric; }
 
+    void NotifyArielOutputStats();
     void NotifyDoneMPIInit();
 
     void PauseApplicationWrappers();

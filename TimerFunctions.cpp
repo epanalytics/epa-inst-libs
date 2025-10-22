@@ -181,7 +181,9 @@ TimerStats* GenerateTimerStats(TimerStats* timers, uint32_t typ, image_key_t iid
             timerCPUFreq=CLOCK_RATE_HZ;
         }
     #elif defined(__aarch64__)
-        timerCPUFreq=100000000;
+        uint32_t cntfrq;
+        asm volatile("mrs %0, cntfrq_el0" : "=r"(cntfrq));
+        timerCPUFreq=cntfrq;
     #else
         timerCPUFreq=1000000;
     #endif

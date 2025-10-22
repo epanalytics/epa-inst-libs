@@ -33,6 +33,7 @@
 #ifndef SLIMSTATS
 #include <AddressRange.hpp>
 #include <CacheSimulation.hpp>
+#include <MemoryLogger.hpp>
 #include <ReuseDistanceASI.hpp>
 #include <ScatterGatherLength.hpp>
 #include <SpatialLocality.hpp>
@@ -140,6 +141,7 @@ AddressStreamDriver::AddressStreamDriver() {
     runCacheSimulation = true;
     runEntropyRange = false;
     runHardwarePrefetching = false;
+    runMemoryLogger = false;
     runReuseDistance = false;
     runScatterLength = false;
     runSpatialLocality = false;
@@ -555,6 +557,19 @@ void AddressStreamDriver::InitializeStatsWithNewStreamStats(AddressStreamStats*
     stats->MemopCount = originalMemopCount;
 }
 #endif
+
+void AddressStreamDriver::NotifyArielOutputStats() {
+    // Thread-safety note: We are assuming that thread safety isn't all that
+    // important for this function and that it is not necessary to stop
+    // address stream collection before doing the output stats.
+    // This call to GetData should be thread-safe, but code following
+    // is not
+    AddressStreamStats* stats = (AddressStreamStats*)allData->GetData();
+    for (vector<AddressStreamTool*>::iterator it = tools->begin(); it !=
+      tools->end(); it++) {
+        (*it)->NotifyArielOutputStats(stats);
+    }
+}
 
 void AddressStreamDriver::NotifyDoneMPIInit() {
     for (vector<AddressStreamTool*>::iterator it = tools->begin(); it !=
@@ -1234,6 +1249,7 @@ void AddressStreamDriver::SetUpTools() {
     uint32_t doCacheSimulation;
     uint32_t doEntropyRange;
     uint32_t doHardwarePrefetching;
+    uint32_t doMemoryLogger;
     uint32_t doReuseDistance;
     uint32_t doScatterGatherLength;
     uint32_t doSpatialLocality;
@@ -1253,6 +1269,9 @@ void AddressStreamDriver::SetUpTools() {
     if (parser->ReadEnvUint32("METASIM_HWPF_SIMULATION", 
       &doHardwarePrefetching)){
         runHardwarePrefetching = (doHardwarePrefetching == 0) ? false : true;
+    }
+    if (parser->ReadEnvUint32("METASIM_MEMORY_LOGGER", &doMemoryLogger)){
+        runMemoryLogger = (doMemoryLogger == 0) ? false : true;
     }
     if (parser->ReadEnvUint32("METASIM_REUSE_DISTANCE", &doReuseDistance)){
         runReuseDistance = (doReuseDistance == 0) ? false : true;
@@ -1323,6 +1342,10 @@ void AddressStreamDriver::SetUpTools() {
               << "Unset Hardware prefetching library tool. Exitting." << ENDL;
             exit(0);
         }
+    }
+
+    if (runMemoryLogger && runCodeCentric) {
+        tools->push_back(new MemoryLoggerTool());
     }
 
     if (runReuseDistance && runCodeCentric) {

@@ -94,6 +94,11 @@ void ArielFrontendTool::FinalizeTool(DataManager<AddressStreamStats*>* AllData,
         tunnelCreator->FinalizeTunnel();
 }
 
+void ArielFrontendTool::NotifyArielOutputStats(AddressStreamStats* stats) {
+    for (auto itr = handlers.begin(); itr != handlers.end(); itr++)
+        (*itr)->OutputStats(stats->ThreadSeq);
+}
+
 // Use this to Initialize the tunnel for MPI applications.
 // There can only be one initialized tunnel, so we give it to the rank that
 // is being traced for Ariel
@@ -168,6 +173,20 @@ void ArielFrontendHandler::InitializeTunnel(ArielFrontendHandler& h) {
 
     tunnel = h.tunnel;
 #endif
+}
+
+void ArielFrontendHandler::OutputStats(uint32_t threadID) {
+    if (GetTaskId() != traceRank)
+        return;
+
+    // Send Start instruction
+    ArielCommand ac;
+    ac.command = ARIEL_OUTPUT_STATS;
+    ac.instPtr = (uint64_t) 0;
+#ifndef ARIEL_DEBUG_MODE
+    tunnel->writeMessage(threadID, ac);
+#endif
+
 }
 
 void ArielFrontendHandler::Print(ofstream& f){
